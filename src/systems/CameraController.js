@@ -25,7 +25,7 @@ export class CameraController {
 
   shake(amp) { this.shakeAmp = Math.max(this.shakeAmp, amp); this.shakeT = 0.3; }
 
-  update(dt, input, player, zone, focus) {
+  update(dt, input, player, zone, focus, talk) {
     // ---- rotación manual ----
     const dx = input.mouseDX, dy = input.mouseDY;
     if (dx || dy) {
@@ -37,7 +37,15 @@ export class CameraController {
     this.distance = damp(this.distance, this.wantDistance, 8, dt);
 
     // ---- recolocación automática detrás del jugador al moverse ----
-    if (focus) {
+    if (talk) {
+      // diálogo: plano lateral que encuadra al jugador y al NPC
+      const ang = Math.atan2(talk.x - player.pos.x, talk.z - player.pos.z) + Math.PI / 2;
+      const a1 = ang, a2 = ang + Math.PI;
+      const pick = Math.abs(Math.atan2(Math.sin(a1 - this.yaw), Math.cos(a1 - this.yaw))) < Math.abs(Math.atan2(Math.sin(a2 - this.yaw), Math.cos(a2 - this.yaw))) ? a1 : a2;
+      this.yaw = dampAngle(this.yaw, pick, 3, dt);
+      this.pitch = damp(this.pitch, 0.22, 3, dt);
+      this.idleLook = 0;
+    } else if (focus) {
       // con un objetivo (jefe), encuadra a ambos
       const ang = Math.atan2(player.pos.x - focus.x, player.pos.z - focus.z);
       this.yaw = dampAngle(this.yaw, ang, 2.5, dt);
@@ -46,7 +54,8 @@ export class CameraController {
     }
 
     // ---- objetivo suavizado ----
-    const tx = player.pos.x, ty = player.pos.y + 1.6, tz = player.pos.z;
+    let tx = player.pos.x, ty = player.pos.y + 1.6, tz = player.pos.z;
+    if (talk) { tx = (tx + talk.x) / 2; tz = (tz + talk.z) / 2; }
     this.target.x = damp(this.target.x, tx, 14, dt);
     this.target.y = damp(this.target.y, ty, 10, dt);
     this.target.z = damp(this.target.z, tz, 14, dt);

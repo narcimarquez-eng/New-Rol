@@ -132,7 +132,7 @@ table.help td:first-child { color: var(--gold); width: 36%; }
 @media (max-width: 760px) {
   #objective { top: auto; bottom: calc(160px + env(safe-area-inset-bottom)); max-width: 70vw; font-size: 13px; }
   #minimap { width: 110px; height: 110px; }
-  .hud-btn { top: calc(max(14px, env(safe-area-inset-top)) + 120px); }
+  .hud-btn { top: max(14px, env(safe-area-inset-top)); right: 136px; }
   #zone-name { font-size: 32px; }
   #dialog { font-size: 17px; }
   .heart { width: 22px; height: 20px; }

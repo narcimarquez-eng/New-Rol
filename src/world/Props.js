@@ -218,12 +218,12 @@ export function buildTorch(pal, { tall = 2.2 } = {}) {
   g.add(pole);
   const flame = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.28, 0),
-    new THREE.MeshBasicMaterial({ color: 0xffb347, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.5, 0.35), toneMapped: false }),
   );
   flame.position.y = tall + 0.4;
   flame.scale.set(1, 1.6, 1);
   g.add(flame);
-  const inner = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshBasicMaterial({ color: 0xfff3b0, toneMapped: false }));
+  const inner = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3.4, 1.8), toneMapped: false }));
   inner.position.y = tall + 0.35;
   g.add(inner);
   g.userData.flame = flame;

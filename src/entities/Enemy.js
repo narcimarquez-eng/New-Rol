@@ -117,7 +117,8 @@ export class Enemy {
     const diff = zoneData.difficulty || 1;
     this.maxHp = Math.round(def.hp * (def.boss ? 1 : diff));
     this.hp = this.maxHp;
-    this.dmg = Math.max(1, Math.round(def.dmg * (def.boss ? 1 : diff)));
+    // la vida escala con la dificultad completa; el daño, a la mitad (más justo)
+    this.dmg = Math.max(1, Math.round(def.dmg * (def.boss ? 1 : 1 + (diff - 1) * 0.5)));
     this.speed = def.speed * (def.boss ? 1 : 0.9 + diff * 0.1);
     this.radius = def.radius;
     this.alive = true;

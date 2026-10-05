@@ -129,7 +129,15 @@ export class Player {
         this.moveBy(f.x * 5 * dt, f.y * 5 * dt);
       }
       // ventana activa del golpe
-      if (this.stateT > dur * 0.28 && this.stateT < dur * 0.62) g.combat.playerSwing(this);
+      if (this.stateT > dur * 0.28 && this.stateT < dur * 0.62) {
+        g.combat.playerSwing(this);
+        const tip = this.model.weaponTip(this._tip || (this._tip = new THREE.Vector3()));
+        if (tip) {
+          const c = this.swordGlow ? 0x9fe7ff : 0xffffff;
+          g.particles.spawn(tip.x, tip.y, tip.z, { color: c, size: 1.1, life: 0.16, gravity: 0, drag: 0 });
+          g.particles.spawn((tip.x + this.pos.x) / 2, tip.y - 0.2, (tip.z + this.pos.z) / 2, { color: c, size: 0.7, life: 0.12, gravity: 0, drag: 0 });
+        }
+      }
       if (this.stateT >= dur) { this.state = 'normal'; this.stateT = 0; }
     } else if (this.state === 'dodge') {
       const k = 1 - this.stateT / 0.42;

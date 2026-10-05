@@ -49,7 +49,7 @@ function catModel() {
 
 function fairyModel() {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 1), new THREE.MeshBasicMaterial({ color: 0xfff6c8, toneMapped: false }));
+  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.5, 1.9), toneMapped: false }));
   body.position.y = 1.8;
   g.add(body);
   const wingMat = new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, toneMapped: false, depthWrite: false });
@@ -284,7 +284,8 @@ export class Pickup extends Base {
     else if (this.item === 'wisp') geo = new THREE.IcosahedronGeometry(0.3, 1);
     else if (this.item === 'axe') geo = P.merge([P.part(new THREE.BoxGeometry(0.1, 1, 0.1), 0x8b5a2b, {}), P.part(new THREE.BoxGeometry(0.5, 0.35, 0.08), 0xbbbbbb, { x: 0.2, y: 0.4 })]);
     else geo = new THREE.IcosahedronGeometry(0.3, 0);
-    const mat = this.item === 'axe' ? P.toonMat() : new THREE.MeshBasicMaterial({ color: it.color, toneMapped: this.item !== 'wisp' });
+    const glowColor = new THREE.Color(it.color).multiplyScalar(this.item === 'wisp' ? 2.6 : 1.25);
+    const mat = this.item === 'axe' ? P.toonMat() : new THREE.MeshBasicMaterial({ color: glowColor, toneMapped: false });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.castShadow = true;
     this.root.add(this.mesh);

@@ -86,7 +86,7 @@ export class Game {
 
     // fondo de la pantalla de título: la aldea
     this.loadZone(START_ZONE, 'start', { silent: true });
-    this.cam.yaw = 2.4; this.cam.pitch = 0.3;
+    this.cam.yaw = 2.4; this.cam.pitch = 0.32; this.cam.wantDistance = this.cam.distance = 16;
     document.getElementById('loading').classList.add('hidden');
 
     window.__game = this; // ganchos para tests automatizados y depuración
@@ -154,6 +154,7 @@ export class Game {
   // ------------------------------------------------------------------ partida
   start(saved) {
     this.audio.unlock();
+    this.cam.wantDistance = this.cam.distance = 9;
     this.progress.reset();
     const p = this.player;
     p.maxHp = 6; p.hp = 6; p.maxStamina = 100; p.stamina = 100; p.swordDamage = 1;
@@ -586,7 +587,7 @@ export class Game {
     if (this.mode !== 'pause') {
       const boss = this.ui.bossTarget && this.ui.bossTarget.alive && this.ui.bossTarget.state !== 'idle' ? this.ui.bossTarget : null;
       const camInput = playing ? inp : { mouseDX: 0, mouseDY: 0, wheel: 0 };
-      this.cam.update(dt, camInput, this.player, this.zone, boss && Math.hypot(boss.x - this.player.x, boss.z - this.player.z) < 22 ? boss : null);
+      this.cam.update(dt, camInput, this.player, this.zone, boss && Math.hypot(boss.x - this.player.x, boss.z - this.player.z) < 22 ? boss : null, this.talkingNpc);
     }
     this.zone.update(this.time);
     this.updateLights();
