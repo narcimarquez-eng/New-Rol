@@ -1,0 +1,649 @@
+// Núcleo del juego: bucle principal, modos (título, juego, diálogo, pausa...),
+// carga de zonas data-driven, interacción, misiones, guardado y luces.
+import * as THREE from 'three';
+import { Renderer } from './Renderer.js';
+import { Input } from './Input.js';
+import { Audio } from './Audio.js';
+import { EventBus } from './EventBus.js';
+import { Save } from './Save.js';
+import { Zone } from '../world/Zone.js';
+import { Player } from '../entities/Player.js';
+import { Enemy } from '../entities/Enemy.js';
+import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal } from '../entities/Interactables.js';
+import { Particles } from '../systems/Particles.js';
+import { Combat } from '../systems/Combat.js';
+import { CameraController } from '../systems/CameraController.js';
+import { Progress } from '../systems/Progress.js';
+import { UI } from '../ui/UI.js';
+import { Touch } from '../ui/Touch.js';
+import { ZONES, START_ZONE } from '../data/zones/index.js';
+import { ITEMS } from '../data/items.js';
+import { QUESTS } from '../data/quests.js';
+import { STORY } from '../data/story.js';
+import { TILE } from '../world/tiles.js';
+
+const MAX_LIGHTS = 6;
+
+export class Game {
+  constructor(container) {
+    const params = new URLSearchParams(location.search);
+    const lowQuality = params.has('low') || (matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) < 900);
+    this.params = params;
+    this.gfx = new Renderer(container, { lowQuality });
+    this.scene = this.gfx.scene;
+    this.camera = this.gfx.camera;
+    this.input = new Input(this.gfx.renderer.domElement);
+    this.audio = new Audio();
+    this.events = new EventBus();
+    this.progress = new Progress();
+    this.particles = new Particles(this.scene);
+    this.combat = new Combat(this);
+    this.cam = new CameraController(this.camera);
+    this.ui = new UI(this);
+    this.touch = new Touch(this);
+    this.player = new Player(this);
+    this.scene.add(this.player.root);
+
+    this.time = 0;
+    this.mode = 'title';
+    this.enemies = [];
+    this.interactables = [];
+    this.dummies = [];
+    this.hitstopT = 0;
+    this.saveTimer = 0;
+    this.godMode = params.has('god');
+
+    this.setupLights(lowQuality);
+    this.lastFrame = performance.now();
+
+    document.addEventListener('pointerlockchange', () => {
+      if (!this.input.locked && this.mode === 'play' && !this.ignoreUnlock) {
+        this.togglePause('inv');
+        this.pauseGuard = performance.now();
+      }
+      this.ignoreUnlock = false;
+    });
+    addEventListener('keydown', (e) => {
+      if (this.mode === 'dialog' && this.ui.dialog) {
+        if (['ArrowLeft', 'KeyA'].includes(e.code)) this.ui.moveChoice(-1);
+        if (['ArrowRight', 'KeyD'].includes(e.code)) this.ui.moveChoice(1);
+      }
+    });
+    addEventListener('visibilitychange', () => { if (document.hidden && this.mode === 'play') this.togglePause('inv'); });
+
+    // pantalla de título
+    const saved = Save.load();
+    const cont = document.getElementById('btn-continue');
+    cont.disabled = !saved;
+    cont.addEventListener('click', () => this.start(saved));
+    document.getElementById('btn-new').addEventListener('click', () => {
+      if (saved && !confirm('¿Empezar una partida nueva? Se perderá la partida guardada.')) return;
+      Save.clear();
+      this.start(null);
+    });
+    document.getElementById('btn-retry').addEventListener('click', () => this.respawn());
+    document.getElementById('btn-keep').addEventListener('click', () => { this.ui.show('ending', false); this.setMode('play'); });
+
+    // fondo de la pantalla de título: la aldea
+    this.loadZone(START_ZONE, 'start', { silent: true });
+    this.cam.yaw = 2.4; this.cam.pitch = 0.3;
+    document.getElementById('loading').classList.add('hidden');
+
+    window.__game = this; // ganchos para tests automatizados y depuración
+    this.loop();
+  }
+
+  // ------------------------------------------------------------------ luces
+  setupLights(low) {
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x445544, 1);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xffffff, 2.5);
+    this.sun.castShadow = true;
+    const s = low ? 1024 : 2048;
+    this.sun.shadow.mapSize.set(s, s);
+    const sc = this.sun.shadow.camera;
+    sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 140;
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.04;
+    this.sun.shadow.radius = 3;
+    this.scene.add(this.sun, this.sun.target);
+    this.pointLights = [];
+    for (let i = 0; i < MAX_LIGHTS; i++) {
+      const l = new THREE.PointLight(0xffa040, 0, 14, 1.6);
+      this.scene.add(l);
+      this.pointLights.push(l);
+    }
+  }
+
+  applyZoneLighting(zone) {
+    const pal = zone.palette;
+    this.hemi.color.set(pal.hemiSky); this.hemi.groundColor.set(pal.hemiGround); this.hemi.intensity = pal.hemiIntensity;
+    this.sun.color.set(pal.sunColor); this.sun.intensity = pal.sunIntensity;
+    this.scene.fog = new THREE.Fog(pal.fog, zone.data.fog.near, zone.data.fog.far);
+    this.scene.background = new THREE.Color(pal.fog);
+  }
+
+  updateLights() {
+    const p = this.player;
+    this.sun.position.set(p.x + 30, 55, p.z + 22);
+    this.sun.target.position.set(p.x, 0, p.z);
+    // las luces puntuales se asignan a las antorchas más cercanas
+    const torches = this.zone.torches
+      .map((t) => ({ t, d: Math.hypot(t.x - p.x, t.z - p.z) }))
+      .sort((a, b) => a.d - b.d);
+    for (let i = 0; i < MAX_LIGHTS; i++) {
+      const l = this.pointLights[i];
+      const e = torches[i];
+      if (!e || e.d > 45) { l.intensity = 0; continue; }
+      const t = e.t;
+      const flick = 0.8 + Math.sin(this.time * 11 + t.phase) * 0.1 + Math.sin(this.time * 23 + t.phase * 2) * 0.07 + Math.random() * 0.05;
+      l.position.set(t.x, t.y + 0.3, t.z);
+      l.intensity = 9 * flick;
+      if (t.obj.userData.flame) {
+        const f = t.obj.userData.flame;
+        f.scale.set(0.9 + flick * 0.2, 1.4 + flick * 0.5, 0.9 + flick * 0.2);
+      }
+    }
+    // las llamas lejanas también se mueven
+    for (const e of torches.slice(MAX_LIGHTS)) {
+      const f = e.t.obj.userData.flame;
+      if (f) f.scale.y = 1.5 + Math.sin(this.time * 12 + e.t.phase) * 0.2;
+    }
+  }
+
+  // ------------------------------------------------------------------ partida
+  start(saved) {
+    this.audio.unlock();
+    this.progress.reset();
+    const p = this.player;
+    p.maxHp = 6; p.hp = 6; p.maxStamina = 100; p.stamina = 100; p.swordDamage = 1;
+    let zone = START_ZONE, spawn = 'start';
+    if (saved) {
+      this.progress.load(saved.progress);
+      Object.assign(p, { maxHp: saved.player.maxHp, hp: Math.max(2, saved.player.hp), maxStamina: saved.player.maxStamina, swordDamage: saved.player.swordDamage });
+      if (this.progress.flags.has('sword_up')) p.setSwordGlow(true);
+      zone = ZONES[saved.zone] ? saved.zone : START_ZONE;
+      spawn = saved.spawn || 'start';
+    }
+    p.stamina = p.maxStamina;
+    this.ui.show('title', false);
+    this.ui.show('hud', true);
+    this.touch.setVisible(this.input.isTouch);
+    this.loadZone(zone, spawn);
+    this.setMode('play');
+    if (!saved) setTimeout(() => this.ui.toast('Habla con el Anciano Bruno (E). Su casa es la del tejado azul.'), 3200);
+  }
+
+  toTitle() {
+    this.save();
+    this.ui.closePause();
+    this.ui.show('hud', false);
+    this.touch.setVisible(false);
+    this.ui.show('title', true);
+    document.getElementById('btn-continue').disabled = false;
+    this.mode = 'title';
+    this.audio.stopMusic();
+    this.input.releaseLock();
+  }
+
+  save() {
+    if (this.mode === 'title' || !this.zone) return;
+    const p = this.player;
+    Save.write({
+      version: 1,
+      zone: this.zone.id,
+      spawn: this.lastSpawn,
+      player: { hp: p.hp, maxHp: p.maxHp, maxStamina: p.maxStamina, swordDamage: p.swordDamage },
+      progress: this.progress.serialize(),
+    });
+  }
+
+  setMode(m) {
+    this.mode = m;
+    if (m !== 'play') this.ui.prompt(null);
+  }
+
+  togglePause(tab) {
+    if (this.mode === 'pause') {
+      this.ui.closePause();
+      this.setMode('play');
+      return;
+    }
+    if (this.mode !== 'play') return;
+    this.setMode('pause');
+    this.ignoreUnlock = this.input.releaseLock();
+    this.ui.openPause(tab);
+  }
+
+  // ------------------------------------------------------------------ zonas
+  loadZone(id, spawnId, { silent = false } = {}) {
+    // limpiar zona anterior
+    if (this.zone) {
+      this.scene.remove(this.zone.group);
+      this.zone.dispose();
+      for (const e of this.enemies) { this.scene.remove(e.root); e.dispose(); }
+      for (const i of this.interactables) { this.scene.remove(i.root); i.dispose(); }
+    }
+    this.enemies = []; this.interactables = []; this.dummies = [];
+    this.particles.clear();
+    this.ui.hideBoss();
+
+    const data = ZONES[id];
+    const zone = new Zone(data);
+    this.zone = zone;
+    this.scene.add(zone.group);
+    this.applyZoneLighting(zone);
+
+    // entidades dinámicas
+    for (const e of data.entities) {
+      switch (e.type) {
+        case 'npc': this.addInteractable(new NPC(this, e)); break;
+        case 'chest': this.addInteractable(new Chest(this, e)); break;
+        case 'door': this.addInteractable(new Door(this, e)); break;
+        case 'sign': this.addInteractable(new Sign(this, e)); break;
+        case 'portal': this.addInteractable(new Portal(this, e)); break;
+        case 'dummy': { const d = new Dummy(this, e); this.dummies.push(d); this.addInteractable(d); break; }
+        case 'pickup':
+          if (!this.progress.flags.has(`picked_${e.id}`)) this.addInteractable(new Pickup(this, e));
+          break;
+        case 'enemy':
+          if (e.flag && this.progress.flags.has(e.flag)) break; // jefe ya derrotado
+          this.spawnEnemy(e);
+          break;
+        default: break;
+      }
+    }
+
+    const spawn = data.entities.find((e) => e.type === 'spawn' && e.id === spawnId) || data.entities.find((e) => e.type === 'spawn');
+    const [sx, sz] = zone.tileToWorld(...spawn.tile);
+    this.player.place(sx, sz, spawn.facing || 0);
+    this.lastSpawn = spawn.id;
+    this.cam.snapBehind(this.player);
+    if (!silent) {
+      this.audio.playMusic(data.music);
+      this.ui.zoneTitle(data.name, data.subtitle);
+      if (id === 'forest') this.progress.flags.add('entered_forest');
+      this.save();
+    }
+  }
+
+  addInteractable(it) {
+    this.interactables.push(it);
+    this.scene.add(it.root);
+    return it;
+  }
+
+  spawnEnemy(spawn) {
+    const e = new Enemy(this, spawn, this.zone.data);
+    this.enemies.push(e);
+    this.scene.add(e.root);
+    return e;
+  }
+
+  spawnPickup(item, x, z) {
+    return this.addInteractable(new Pickup(this, { item }, x, z));
+  }
+
+  usePortal(data) {
+    if (!ZONES[data.to]) {
+      // zona aún no construida: fin de la Fase 1
+      if (!this.progress.flags.has('phase1_complete')) {
+        this.progress.flags.add('phase1_complete');
+        this.save();
+      }
+      this.showEnding();
+      // devolver al jugador un paso atrás para que no se repita
+      this.player.pos.z += 4;
+      return;
+    }
+    this.transitioning = true;
+    const fade = document.getElementById('fade');
+    fade.classList.add('on');
+    this.audio.sfx('door');
+    setTimeout(() => {
+      this.loadZone(data.to, data.spawn);
+      fade.classList.remove('on');
+      this.transitioning = false;
+    }, 380);
+  }
+
+  showEnding() {
+    const pr = this.progress;
+    const mins = Math.round(pr.playTime / 60);
+    const done = Object.keys(QUESTS).filter((q) => pr.questState(q) === 'done').length;
+    const chests = [...pr.flags].filter((f) => f.startsWith('chest_')).length;
+    document.getElementById('ending-stats').innerHTML =
+      `Tiempo: <b>${mins} min</b> · Misiones: <b>${done}/${Object.keys(QUESTS).length}</b> · Cofres: <b>${chests}</b> · Enemigos: <b>${pr.totalKills}</b>`;
+    this.ui.show('ending', true);
+    this.setMode('ending');
+    this.input.releaseLock();
+    this.audio.sfx('quest');
+  }
+
+  // ------------------------------------------------------------------ historia y diálogos
+  currentObjective() {
+    for (const s of STORY) if (!s.until || !this.progress.check(s.until)) return s.text;
+    return '';
+  }
+
+  /** ¿Tiene el NPC algo nuevo que decir (misión disponible o lista para entregar)? */
+  npcHasNews(npc) {
+    const pr = this.progress;
+    for (const [id, q] of Object.entries(QUESTS)) {
+      if (q.target === npc.id && pr.questState(id) === 'active' && (q.type !== 'deliver' || pr.has(q.item))) return true;
+    }
+    for (const id of npc.data.quests || []) {
+      const st = pr.questState(id);
+      if (st === 'ready') return true;
+      if (st === 'none' && pr.check(QUESTS[id].requires)) return true;
+    }
+    if (npc.id === 'elder') return !pr.flags.has('met_elder') || (pr.flags.has('dummies_done') && !pr.flags.has('tutorial_done'));
+    return false;
+  }
+
+  /** Resuelve qué dice un NPC según el estado de misiones y banderas. */
+  talkTo(npc) {
+    const pr = this.progress;
+    const say = (lines, opts = {}) => {
+      npc.talking = true;
+      this.setMode('dialog');
+      this.ui.openDialog(npc.name, lines, opts);
+      this.talkingNpc = npc;
+    };
+
+    // 1) es el objetivo de una misión activa
+    for (const [id, q] of Object.entries(QUESTS)) {
+      if (q.target !== npc.id || pr.questState(id) !== 'active') continue;
+      if (q.type === 'talk' && !pr.flags.has(`talked_${id}`)) {
+        return say(q.lines.target, { onEnd: () => { pr.flags.add(`talked_${id}`); this.ui.toast(`${q.name}: vuelve a hablar con quien te lo pidió.`); this.audio.sfx('quest'); } });
+      }
+      if (q.type === 'deliver' && pr.has(q.item)) {
+        return say(q.lines.target, { onEnd: () => { pr.take(q.item); this.completeQuest(id); } });
+      }
+    }
+    // 2) misiones que ofrece
+    const qs = npc.data.quests || [];
+    for (const id of qs) {
+      const q = QUESTS[id], st = pr.questState(id);
+      if (st === 'ready') return say(q.lines.complete, { onEnd: () => { if (q.consume && q.item) pr.take(q.item, q.count); this.completeQuest(id); } });
+      if (st === 'active') return say(q.lines.active);
+      if (st === 'none' && pr.check(q.requires)) {
+        return say(q.lines.offer, {
+          choices: [
+            { label: 'Aceptar', fn: () => this.startQuest(id) },
+            { label: 'Ahora no', fn: () => {} },
+          ],
+        });
+      }
+    }
+    // 3) reglas propias del NPC
+    const rule = (npc.data.talk || []).find((r) => pr.check(r.when));
+    let lines = rule ? rule.lines : ['...'];
+    const doneQuest = [...qs].reverse().find((id) => pr.questState(id) === 'done');
+    if (doneQuest && (!rule || !rule.when)) lines = QUESTS[doneQuest].lines.done;
+    const end = () => {
+      if (rule?.do) this.runActions(rule.do);
+      if (npc.data.heal) this.healFull(npc);
+      if (npc.data.shop) this.ui.openShop(npc);
+    };
+    return say(lines, { onEnd: end });
+  }
+
+  runActions(actions) {
+    for (const a of actions) {
+      if (a.flag) this.progress.flags.add(a.flag);
+      if (a.give) this.giveItem(a.give[0], a.give[1] || 1, { fanfare: true });
+      if (a.take) this.progress.take(a.take[0], a.take[1] || 1);
+    }
+    this.save();
+  }
+
+  startQuest(id) {
+    const q = QUESTS[id];
+    this.progress.startQuest(id);
+    this.audio.sfx('quest');
+    this.ui.toast(`Nueva misión: ${q.name}`);
+    if (q.type === 'deliver') this.giveItem(q.item, 1, { fanfare: true });
+    this.save();
+  }
+
+  completeQuest(id) {
+    const q = QUESTS[id];
+    this.progress.finishQuest(id);
+    this.audio.sfx('quest');
+    this.ui.toast(`¡Misión completada: ${q.name}!`);
+    q.reward.forEach(([item, n], i) => setTimeout(() => this.giveItem(item, n, { fanfare: true }), 300 + i * 1300));
+    this.save();
+  }
+
+  healFull(src) {
+    const p = this.player;
+    if (p.hp < p.maxHp) {
+      p.hp = p.maxHp;
+      this.audio.sfx('heart');
+      this.particles.sparkle(p.x, p.pos.y, p.z, { color: 0xff8fab, count: 40 });
+      this.ui.toast('Tus heridas sanan por completo.');
+    }
+  }
+
+  onDialogClosed() {
+    if (this.talkingNpc) { this.talkingNpc.talking = false; this.talkingNpc = null; }
+    if (this.mode === 'dialog') this.setMode('play');
+  }
+
+  // ------------------------------------------------------------------ objetos
+  giveItem(id, qty = 1, { fanfare = false, silent = false } = {}) {
+    const it = ITEMS[id];
+    if (!it) return;
+    const p = this.player, pr = this.progress;
+    switch (it.kind) {
+      case 'currency': pr.coins += (it.amount || 1) * qty; if (!fanfare) this.audio.sfx('coin'); break;
+      case 'instant': p.heal(it.heal * qty); this.audio.sfx('heart'); break;
+      case 'upgrade':
+        if (id === 'heart_container') { p.maxHp += 2 * qty; p.hp = p.maxHp; }
+        if (id === 'stamina_up') { p.maxStamina += 25 * qty; p.stamina = p.maxStamina; }
+        if (id === 'sword_up') { p.swordDamage = 2; pr.flags.add('sword_up'); p.setSwordGlow(true); }
+        break;
+      default:
+        pr.add(id, qty);
+        if (it.max) pr.items[id] = Math.min(it.max, pr.items[id]);
+    }
+    if (fanfare && !silent) {
+      this.ui.itemGet(id, qty);
+      this.audio.sfx(it.kind === 'key' || it.kind === 'upgrade' ? 'item' : 'coin');
+    }
+    // avisar si una misión de recolección quedó lista
+    for (const [qid, q] of Object.entries(QUESTS)) {
+      if (q.type === 'collect' && q.item === id && pr.questState(qid) === 'ready') this.ui.toast(`${q.name}: ¡ya tienes todo! Vuelve a hablar.`);
+    }
+  }
+
+  usePotion() {
+    const p = this.player, pr = this.progress;
+    if (!pr.has('potion')) { this.ui.toast('No tienes pociones.'); return; }
+    if (p.hp >= p.maxHp) { this.ui.toast('Ya tienes la vida completa.'); return; }
+    pr.take('potion');
+    p.heal(ITEMS.potion.heal);
+    this.audio.sfx('potion');
+    this.particles.sparkle(p.x, p.pos.y, p.z, { color: 0xff6b8a, count: 30 });
+  }
+
+  // ------------------------------------------------------------------ combate
+  onEnemyKilled(e) {
+    const g = this;
+    g.audio.sfx('kill');
+    g.particles.puff(e.x, e.pos.y + 0.6 + (e.flyY || 0), e.z, { color: 0xffffff, count: 12, size: 2.4 });
+    g.particles.burst(e.x, e.pos.y + 1 + (e.flyY || 0), e.z, { count: 20, color: e.def.color, speed: 6, up: 4, life: 0.7 });
+    for (const [item, prob] of e.def.drops) {
+      if (Math.random() < prob) {
+        if (e.def.boss) setTimeout(() => this.giveItem(item, 1, { fanfare: true }), 1500);
+        else this.spawnPickup(item, e.x + (Math.random() - 0.5), e.z + (Math.random() - 0.5));
+      }
+    }
+    const ready = this.progress.onKill(e.kind);
+    for (const id of ready) { this.audio.sfx('quest'); this.ui.toast(`${QUESTS[id].name}: ¡objetivo cumplido! Vuelve a hablar.`); }
+    if (e.spawn.flag) {
+      this.progress.flags.add(e.spawn.flag);
+      this.ui.toast(`¡Has derrotado al ${e.def.name}!`);
+      this.shake(0.8);
+      this.particles.sparkle(e.x, e.pos.y, e.z, { count: 80, radius: 3, color: 0xffd34d, life: 2 });
+      // los refuerzos invocados huyen
+      for (const o of this.enemies) if (o.spawn.summoned && o.alive) o.die();
+      this.save();
+    }
+  }
+
+  onPlayerDeath() {
+    this.audio.sfx('death');
+    setTimeout(() => {
+      this.setMode('dead');
+      this.ui.show('gameover', true);
+      this.input.releaseLock();
+    }, 1400);
+  }
+
+  respawn() {
+    this.ui.show('gameover', false);
+    const p = this.player;
+    p.hp = Math.max(6, Math.floor(p.maxHp / 2 / 2) * 2);
+    p.stamina = p.maxStamina;
+    this.loadZone(this.zone.id, this.lastSpawn);
+    this.setMode('play');
+  }
+
+  hitstop(t) { this.hitstopT = Math.max(this.hitstopT, t); }
+  shake(a) { this.cam.shake(a); }
+
+  // ------------------------------------------------------------------ bucle
+  loop() {
+    requestAnimationFrame(() => this.loop());
+    const now = performance.now();
+    let dt = Math.min((now - this.lastFrame) / 1000, 1 / 30);
+    this.lastFrame = now;
+    if (this.params.has('fixeddt')) dt = 1 / 60;
+    this.step(dt);
+  }
+
+  step(dt) {
+    this.time += dt;
+    const inp = this.input;
+
+    if (this.mode === 'title') {
+      // cámara lenta orbitando la aldea
+      this.cam.yaw += dt * 0.05;
+      this.zone.update(this.time);
+      for (const i of this.interactables) i.update(dt);
+      this.cam.update(dt, { mouseDX: 0, mouseDY: 0, wheel: 0 }, this.player, this.zone);
+      this.updateLights();
+      this.particles.update(dt);
+      this.gfx.render();
+      inp.endFrame();
+      return;
+    }
+
+    if ((inp.consume('pause') || inp.consume('menu')) && !(performance.now() - (this.pauseGuard || 0) < 250)) {
+      if (this.mode === 'shop') this.ui.closeShop();
+      else if (this.mode === 'play' || this.mode === 'pause') this.togglePause('inv');
+    }
+
+    if (this.mode === 'dialog') {
+      this.ui.updateDialog(dt);
+      if (inp.consume('interact') || inp.consume('attack')) this.ui.advanceDialog();
+    }
+
+    let simDt = dt;
+    if (this.hitstopT > 0) { this.hitstopT -= dt; simDt = dt * 0.05; }
+    const playing = this.mode === 'play';
+    const simulate = playing || this.mode === 'dialog' || this.mode === 'dead';
+
+    if (simulate) {
+      this.progress.playTime += dt;
+      if (playing) {
+        this.player.update(simDt, inp, this.cam.yaw);
+        if (inp.consume('potion')) this.usePotion();
+      } else {
+        this.player.update(simDt, { moveVector: () => ({ x: 0, y: 0 }), isDown: () => false, consume: () => false }, this.cam.yaw);
+      }
+      for (const e of this.enemies) e.update(simDt, this.player);
+      this.combat.separate();
+      this.enemies = this.enemies.filter((e) => {
+        if (e.removed) { this.scene.remove(e.root); e.dispose(); return false; }
+        return true;
+      });
+      for (const i of this.interactables) i.update(simDt);
+      this.interactables = this.interactables.filter((i) => {
+        if (i.removed) { this.scene.remove(i.root); i.dispose(); return false; }
+        return true;
+      });
+      if (playing) this.updateInteraction(inp);
+      this.updateExploration();
+      this.updateAmbient(dt);
+      this.saveTimer += dt;
+      if (this.saveTimer > 30) { this.saveTimer = 0; this.save(); }
+    }
+
+    // cámara (en pausa se queda quieta)
+    if (this.mode !== 'pause') {
+      const boss = this.ui.bossTarget && this.ui.bossTarget.alive && this.ui.bossTarget.state !== 'idle' ? this.ui.bossTarget : null;
+      const camInput = playing ? inp : { mouseDX: 0, mouseDY: 0, wheel: 0 };
+      this.cam.update(dt, camInput, this.player, this.zone, boss && Math.hypot(boss.x - this.player.x, boss.z - this.player.z) < 22 ? boss : null);
+    }
+    this.zone.update(this.time);
+    this.updateLights();
+    this.particles.update(simulate ? simDt : dt * 0.2);
+    if (this.mode !== 'title') {
+      this.ui.updateHUD();
+      this.miniT = (this.miniT || 0) + dt;
+      if (this.miniT > 0.1) { this.miniT = 0; this.ui.drawMap(this.ui.mapCtx, this.ui.mapCanvas.width); }
+    }
+    if (!this.noRender) this.gfx.render();
+    inp.endFrame();
+  }
+
+  /** Busca el objeto interactivo más cercano y muestra el aviso. */
+  updateInteraction(inp) {
+    const p = this.player;
+    let best = null, bd = Infinity;
+    for (const it of this.interactables) {
+      if (!it.visible || !it.prompt) continue;
+      const d = Math.hypot(it.x - p.x, it.z - p.z);
+      if (d > it.radius) continue;
+      // preferir lo que está delante
+      const ang = Math.atan2(it.x - p.x, it.z - p.z) - p.facing;
+      const score = d + (Math.cos(ang) < 0 ? 1.5 : 0);
+      if (score < bd) { bd = score; best = it; }
+    }
+    this.ui.prompt(best ? best.prompt : null);
+    if (best && inp.consume('interact')) best.interact();
+    // fuente de las hadas
+    const f = this.zone.fountain;
+    if (f && Math.hypot(p.x - f.x, p.z - f.z) < f.radius + 3 && p.hp < p.maxHp) {
+      p.hp = Math.min(p.maxHp, p.hp + 0.75 * (1 / 60) * 4);
+      if (Math.random() < 0.3) this.particles.spawn(p.x + (Math.random() - 0.5), p.pos.y + 0.5, p.z + (Math.random() - 0.5), { vy: 2, color: 0xff8fab, size: 0.6, gravity: -1, life: 0.8 });
+      if (p.hp >= p.maxHp) { p.hp = p.maxHp; this.audio.sfx('heart'); }
+    }
+  }
+
+  /** Niebla de guerra del minimapa: marca casillas vistas alrededor del jugador. */
+  updateExploration() {
+    const z = this.zone, p = this.player;
+    const seen = this.progress.seenTiles(z.id, z.W * z.H);
+    const [c0, r0] = z.collision.tileOf(p.x, p.z);
+    const R = 5;
+    for (let r = r0 - R; r <= r0 + R; r++) for (let c = c0 - R; c <= c0 + R; c++) {
+      if (c < 0 || r < 0 || c >= z.W || r >= z.H) continue;
+      if ((c - c0) ** 2 + (r - r0) ** 2 <= R * R) seen[r * z.W + c] = 1;
+    }
+  }
+
+  updateAmbient(dt) {
+    if (this.zone.data.ambient === 'fireflies' && Math.random() < dt * 12) {
+      const p = this.player;
+      const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 18;
+      const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+      this.particles.spawn(x, this.zone.height(x, z) + 0.5 + Math.random() * 2.5, z, { color: Math.random() < 0.5 ? 0xd8ff8a : 0x9fffd0, size: 0.35, life: 2.5, gravity: -0.05, vx: (Math.random() - 0.5) * 0.6, vz: (Math.random() - 0.5) * 0.6, drag: 0.2 });
+    }
+  }
+}
+
+export { TILE };

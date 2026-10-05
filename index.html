@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b2b3a" />
+  <meta name="description" content="New Rol — aventura de acción 3D low-poly en el navegador." />
+  <title>New Rol</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗡️</text></svg>" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top-left">
+      <div id="hearts"></div>
+      <div id="stamina"><div id="stamina-fill"></div></div>
+      <div id="counters">
+        <span class="counter"><span class="ico">🪙</span><b id="coins">0</b></span>
+        <span class="counter"><span class="ico">🧪</span><b id="potions">0</b></span>
+        <span class="counter" id="keys-counter"></span>
+      </div>
+    </div>
+    <div id="objective"><span class="label">Objetivo</span><span id="objective-text"></span></div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="zone-name"></div>
+    <div id="prompt" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="boss" class="hidden"><div id="boss-name"></div><div id="boss-bar"><div id="boss-fill"></div></div></div>
+    <button id="btn-menu" class="hud-btn" title="Menú (Tab)">☰</button>
+  </div>
+
+  <!-- diálogo -->
+  <div id="dialog" class="hidden">
+    <div id="dialog-name"></div>
+    <div id="dialog-text"></div>
+    <div id="dialog-choices"></div>
+    <div id="dialog-next">▼</div>
+  </div>
+
+  <!-- objeto conseguido -->
+  <div id="itemget" class="hidden"><div class="itemget-icon"></div><div class="itemget-name"></div><div class="itemget-desc"></div></div>
+
+  <!-- tienda -->
+  <div id="shop" class="panel hidden">
+    <h2>Tienda de Rosa</h2>
+    <div id="shop-list"></div>
+    <button class="btn" id="shop-close">Salir (Esc)</button>
+  </div>
+
+  <!-- menú de pausa -->
+  <div id="pause" class="panel hidden">
+    <div class="tabs">
+      <button class="tab active" data-tab="inv">Inventario</button>
+      <button class="tab" data-tab="quests">Misiones</button>
+      <button class="tab" data-tab="map">Mapa</button>
+      <button class="tab" data-tab="help">Controles</button>
+    </div>
+    <div class="tab-body" id="tab-inv"></div>
+    <div class="tab-body hidden" id="tab-quests"></div>
+    <div class="tab-body hidden" id="tab-map"><canvas id="bigmap" width="440" height="440"></canvas></div>
+    <div class="tab-body hidden" id="tab-help">
+      <table class="help">
+        <tr><td>Moverse</td><td>WASD / Flechas · joystick táctil</td></tr>
+        <tr><td>Cámara</td><td>Ratón (clic en el juego para capturarlo) · rueda: zoom · arrastrar a la derecha en móvil</td></tr>
+        <tr><td>Atacar (combo)</td><td>Clic izquierdo / F</td></tr>
+        <tr><td>Bloquear</td><td>Clic derecho (mantener) / R</td></tr>
+        <tr><td>Esquivar</td><td>Espacio</td></tr>
+        <tr><td>Correr</td><td>Mayús (gasta resistencia)</td></tr>
+        <tr><td>Hablar / abrir</td><td>E / Enter</td></tr>
+        <tr><td>Poción</td><td>Q</td></tr>
+        <tr><td>Menú</td><td>Tab / I</td></tr>
+        <tr><td>Pausa</td><td>Esc / P</td></tr>
+      </table>
+    </div>
+    <div class="pause-actions">
+      <button class="btn" id="btn-resume">Continuar</button>
+      <button class="btn" id="btn-mute">Sonido: sí</button>
+      <button class="btn" id="btn-save">Guardar</button>
+      <button class="btn danger" id="btn-title">Menú principal</button>
+    </div>
+  </div>
+
+  <!-- pantalla de título -->
+  <div id="title" class="screen">
+    <div class="title-inner">
+      <h1>New&nbsp;Rol</h1>
+      <p class="tagline">Una aventura de espada y hojas</p>
+      <div class="title-buttons">
+        <button class="btn big" id="btn-continue" disabled>Continuar</button>
+        <button class="btn big" id="btn-new">Nueva partida</button>
+      </div>
+      <p class="hint">WASD para moverte · ratón para la cámara · clic para atacar</p>
+      <p id="loading">Cargando…</p>
+    </div>
+  </div>
+
+  <!-- game over -->
+  <div id="gameover" class="screen hidden">
+    <div class="title-inner">
+      <h1 class="red">Has caído…</h1>
+      <p class="tagline">Pero la aventura no termina aquí.</p>
+      <div class="title-buttons"><button class="btn big" id="btn-retry">Levantarse</button></div>
+    </div>
+  </div>
+
+  <!-- fin de fase -->
+  <div id="ending" class="screen hidden">
+    <div class="title-inner">
+      <h1>¡Fase 1 completada!</h1>
+      <p class="tagline">Has recuperado la Llave del Bosque y la luz vuelve a la Aldea.</p>
+      <p>Más allá de la puerta norte esperan las <b>Cuevas Heladas</b>, el <b>Desierto Perdido</b> y el <b>Castillo Final</b>.<br/>Llegarán en las próximas fases.</p>
+      <div id="ending-stats"></div>
+      <div class="title-buttons"><button class="btn big" id="btn-keep">Seguir explorando</button></div>
+    </div>
+  </div>
+
+  <!-- controles táctiles -->
+  <div id="touch" class="hidden">
+    <div id="joy"><div id="joy-knob"></div></div>
+    <div id="touch-buttons">
+      <button class="tbtn" id="t-attack">⚔️</button>
+      <button class="tbtn" id="t-block">🛡️</button>
+      <button class="tbtn" id="t-dodge">💨</button>
+      <button class="tbtn" id="t-interact">E</button>
+      <button class="tbtn small" id="t-potion">🧪</button>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
