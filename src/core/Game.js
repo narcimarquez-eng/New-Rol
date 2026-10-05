@@ -11,6 +11,8 @@ import { Player } from '../entities/Player.js';
 import { Enemy } from '../entities/Enemy.js';
 import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal } from '../entities/Interactables.js';
 import { Particles } from '../systems/Particles.js';
+import { Projectiles } from '../systems/Projectiles.js';
+import { GLOBAL } from '../gfx/ModelKit.js';
 import { Combat } from '../systems/Combat.js';
 import { CameraController } from '../systems/CameraController.js';
 import { Progress } from '../systems/Progress.js';
@@ -38,6 +40,7 @@ export class Game {
     this.progress = new Progress();
     this.particles = new Particles(this.scene);
     this.combat = new Combat(this);
+    this.projectiles = new Projectiles(this);
     this.cam = new CameraController(this.camera);
     this.ui = new UI(this);
     this.touch = new Touch(this);
@@ -121,6 +124,7 @@ export class Game {
     this.sun.color.set(pal.sunColor); this.sun.intensity = pal.sunIntensity;
     this.scene.fog = new THREE.Fog(pal.fog, zone.data.fog.near, zone.data.fog.far);
     this.scene.background = new THREE.Color(pal.fog);
+    this.gfx.setGrade(zone.data.grade || {});
   }
 
   updateLights() {
@@ -136,9 +140,12 @@ export class Game {
       const e = torches[i];
       if (!e || e.d > 45) { l.intensity = 0; continue; }
       const t = e.t;
-      const flick = 0.8 + Math.sin(this.time * 11 + t.phase) * 0.1 + Math.sin(this.time * 23 + t.phase * 2) * 0.07 + Math.random() * 0.05;
+      // antorchas parpadean; los cristales laten despacio
+      const flick = t.crystal ? 0.85 + Math.sin(this.time * 1.5 + t.phase) * 0.15
+        : 0.8 + Math.sin(this.time * 11 + t.phase) * 0.1 + Math.sin(this.time * 23 + t.phase * 2) * 0.07 + Math.random() * 0.05;
       l.position.set(t.x, t.y + 0.3, t.z);
-      l.intensity = 9 * flick;
+      l.color.set(t.color ?? 0xffa040);
+      l.intensity = (t.crystal ? 7 : 9) * flick;
       if (t.obj.userData.flame) {
         const f = t.obj.userData.flame;
         f.scale.set(0.9 + flick * 0.2, 1.4 + flick * 0.5, 0.9 + flick * 0.2);
@@ -162,7 +169,8 @@ export class Game {
     if (saved) {
       this.progress.load(saved.progress);
       Object.assign(p, { maxHp: saved.player.maxHp, hp: Math.max(2, saved.player.hp), maxStamina: saved.player.maxStamina, swordDamage: saved.player.swordDamage });
-      if (this.progress.flags.has('sword_up')) p.setSwordGlow(true);
+      if (this.progress.flags.has('sword_steel')) p.setSwordGlow(true, 0xffe08a);
+      else if (this.progress.flags.has('sword_up')) p.setSwordGlow(true);
       zone = ZONES[saved.zone] ? saved.zone : START_ZONE;
       spawn = saved.spawn || 'start';
     }
@@ -226,11 +234,14 @@ export class Game {
       for (const i of this.interactables) { this.scene.remove(i.root); i.dispose(); }
     }
     this.enemies = []; this.interactables = []; this.dummies = [];
+    if (this.ui.dialog) this.ui.closeDialog();
+    this.talkingNpc = null;
     this.particles.clear();
+    this.projectiles.clear();
     this.ui.hideBoss();
 
     const data = ZONES[id];
-    const zone = new Zone(data);
+    const zone = new Zone(data, { high: !this.gfx.lowQuality });
     this.zone = zone;
     this.scene.add(zone.group);
     this.applyZoneLighting(zone);
@@ -443,7 +454,9 @@ export class Game {
       case 'upgrade':
         if (id === 'heart_container') { p.maxHp += 2 * qty; p.hp = p.maxHp; }
         if (id === 'stamina_up') { p.maxStamina += 25 * qty; p.stamina = p.maxStamina; }
-        if (id === 'sword_up') { p.swordDamage = 2; pr.flags.add('sword_up'); p.setSwordGlow(true); }
+        // cada mejora de espada suma 1 de daño
+        if (id === 'sword_up') { p.swordDamage += 1; pr.flags.add('sword_up'); if (!pr.flags.has('sword_steel')) p.setSwordGlow(true); }
+        if (id === 'sword_steel') { p.swordDamage += 1; pr.flags.add('sword_steel'); p.setSwordGlow(true, 0xffe08a); }
         break;
       default:
         pr.add(id, qty);
@@ -527,6 +540,8 @@ export class Game {
 
   step(dt) {
     this.time += dt;
+    GLOBAL.time.value = this.time;
+    GLOBAL.playerPos.value.copy(this.player.pos);
     const inp = this.input;
 
     if (this.mode === 'title') {
@@ -566,6 +581,7 @@ export class Game {
         this.player.update(simDt, { moveVector: () => ({ x: 0, y: 0 }), isDown: () => false, consume: () => false }, this.cam.yaw);
       }
       for (const e of this.enemies) e.update(simDt, this.player);
+      this.projectiles.update(simDt);
       this.combat.separate();
       this.enemies = this.enemies.filter((e) => {
         if (e.removed) { this.scene.remove(e.root); e.dispose(); return false; }
@@ -597,7 +613,10 @@ export class Game {
       this.miniT = (this.miniT || 0) + dt;
       if (this.miniT > 0.1) { this.miniT = 0; this.ui.drawMap(this.ui.mapCtx, this.ui.mapCanvas.width); }
     }
-    if (!this.noRender) this.gfx.render();
+    if (!this.noRender) {
+      this.gfx.render();
+      if (this.mode === 'play') this.gfx.adapt(dt);
+    }
     inp.endFrame();
   }
 

@@ -24,6 +24,11 @@ export const TILES = {
   '~': { ground: 'water', solid: 'box', water: true },
   'B': { ground: 'water', prop: 'bridge', bridge: true },
   'F': { ground: 'grass', solid: 'box', prop: 'fence' },
+  // ---- Cuevas Heladas ----
+  'n': { ground: 'snow' },
+  'i': { ground: 'ice', ice: true },
+  'c': { ground: 'snow', solid: 'circle', radius: 1.0, tall: true, height: 3, prop: 'crystal' },
+  'I': { ground: 'ice', solid: 'box', tall: true, height: 4, prop: 'icepillar' },
 };
 
 export const DEFAULT_TILE = TILES['.'];

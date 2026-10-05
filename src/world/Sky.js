@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { part, merge, toonMat, instanced, mountainGeo } from './Props.js';
 import { rng } from '../core/utils.js';
+import { spart, smerge, rockify } from '../gfx/ModelKit.js';
 
 export function buildSky(pal) {
   const geo = new THREE.SphereGeometry(300, 24, 12);
@@ -44,10 +45,12 @@ export function buildSky(pal) {
 
 export function buildClouds(pal, seed = 3) {
   const r = rng(seed);
-  const geo = merge([
-    part(new THREE.IcosahedronGeometry(1, 0), 0xffffff, { sx: 1.6, sy: 0.7 }),
-    part(new THREE.IcosahedronGeometry(0.8, 0), 0xffffff, { x: 1.2, y: 0.2, sy: 0.7 }),
-    part(new THREE.IcosahedronGeometry(0.7, 0), 0xffffff, { x: -1.1, y: 0.1, sy: 0.6 }),
+  // nubes esponjosas: varias bolas suaves con la base más oscura
+  const geo = smerge([
+    spart(rockify(new THREE.IcosahedronGeometry(1, 2), 0.05, 1), 0xffffff, { sx: 1.7, sy: 0.75, ao: 0.35 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.85, 2), 0.05, 2), 0xffffff, { x: 1.25, y: 0.25, sy: 0.8, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.75, 2), 0.05, 3), 0xffffff, { x: -1.2, y: 0.12, sy: 0.7, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.7, 2), 0.05, 4), 0xffffff, { x: 0.3, y: 0.55, z: 0.2, ao: 0.2 }),
   ]);
   const items = [];
   for (let i = 0; i < 26; i++) {
@@ -74,16 +77,33 @@ export function buildMountains(pal, radius, seed = 5) {
   return mesh;
 }
 
-/** Plano de agua con ondas y espuma toon. */
-export function buildWater(width, depth, pal) {
-  const geo = new THREE.PlaneGeometry(width, depth, Math.ceil(width / 4), Math.ceil(depth / 4));
+/** Textura de alturas del terreno (0..1 codifica -3..+2 m) para la espuma de orilla. */
+function heightTexture(terrain) {
+  const w = terrain.VW, h = terrain.VH;
+  const data = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const v = Math.max(0, Math.min(255, Math.round(((terrain.heights[i] + 3) / 5) * 255)));
+    data[i * 4] = v; data[i * 4 + 1] = v; data[i * 4 + 2] = v; data[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Plano de agua con ondas, profundidad, espuma en la orilla y destellos. */
+export function buildWater(width, depth, pal, terrain, level = -0.55) {
+  const geo = new THREE.PlaneGeometry(width, depth, Math.ceil(width / 2), Math.ceil(depth / 2));
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.ShaderMaterial({
     transparent: true,
     fog: true,
     uniforms: THREE.UniformsUtils.merge([
       THREE.UniformsLib.fog,
-      { time: { value: 0 }, deep: { value: new THREE.Color(pal.waterDeep) }, shallow: { value: new THREE.Color(pal.water) } },
+      {
+        time: { value: 0 }, deep: { value: new THREE.Color(pal.waterDeep) }, shallow: { value: new THREE.Color(pal.water) },
+        heights: { value: null }, hOrigin: { value: new THREE.Vector2() }, hSize: { value: new THREE.Vector2() }, level: { value: level },
+      },
     ]),
     vertexShader: /* glsl */`
       uniform float time;
@@ -98,20 +118,34 @@ export function buildWater(width, depth, pal) {
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`
-      uniform float time;
+      uniform float time, level;
       uniform vec3 deep, shallow;
+      uniform sampler2D heights;
+      uniform vec2 hOrigin, hSize;
       varying vec3 vPos;
       #include <fog_pars_fragment>
       void main() {
+        vec2 uv = (vPos.xz - hOrigin) / hSize;
+        float ground = texture2D(heights, uv).r * 5.0 - 3.0;
+        float d = level - ground;            // profundidad del agua
+        if (d < -0.05) discard;
+        vec3 c = mix(shallow, deep, smoothstep(0.0, 1.3, d));
+        // ondas y destellos
         float w = sin(vPos.x * 1.3 + time * 1.7) * sin(vPos.z * 1.1 - time * 1.3);
-        float foam = step(0.82, w);
-        vec3 c = mix(deep, shallow, 0.5 + 0.5 * sin((vPos.x + vPos.z) * 0.15 + time * 0.5));
-        c = mix(c, vec3(1.0), foam * 0.55);
-        gl_FragColor = vec4(c, 0.86);
+        c = mix(c, vec3(1.0), step(0.86, w) * 0.35);
+        // espuma animada en la orilla
+        float band = smoothstep(0.32, 0.0, d + sin(time * 2.0 + vPos.x * 0.8 + vPos.z * 0.6) * 0.06);
+        c = mix(c, vec3(1.0), band * 0.85);
+        gl_FragColor = vec4(c, mix(0.78, 0.95, band));
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
   });
+  if (terrain) {
+    mat.uniforms.heights.value = heightTexture(terrain);
+    mat.uniforms.hOrigin.value.set(terrain.originX, terrain.originZ);
+    mat.uniforms.hSize.value.set((terrain.VW - 1) * terrain.step, (terrain.VH - 1) * terrain.step);
+  }
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'water';
   mesh.userData.update = (t) => { mat.uniforms.time.value = t; };

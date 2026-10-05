@@ -6,6 +6,14 @@ import * as P from '../world/Props.js';
 import { ITEMS } from '../data/items.js';
 import { TILE } from '../world/tiles.js';
 import { dampAngle } from '../core/utils.js';
+import { addOutline } from '../gfx/ModelKit.js';
+
+/** Contorno de tinta para todas las mallas opacas de un objeto. */
+function outlineAll(obj, t = 0.04) {
+  const meshes = [];
+  obj.traverse((o) => { if (o.isMesh && !o.material.transparent && o.material.type !== 'MeshBasicMaterial' && o.name !== 'outline') meshes.push(o); });
+  for (const m of meshes) addOutline(m, t);
+}
 
 class Base {
   constructor(game, data) {
@@ -71,6 +79,7 @@ export class NPC extends Base {
     if (data.look === 'cat') { this.model = null; this.mesh = catModel(); this.radius = 2.0; }
     else if (data.look === 'fairy') { this.model = null; this.mesh = fairyModel(); this.fairy = true; this.mapColor = '#bff8ff'; }
     else { this.model = new CharacterModel(data.look || {}); this.mesh = this.model.root; }
+    if (data.look === 'cat') outlineAll(this.mesh, 0.025);
     this.root.add(this.mesh);
     this.facing = data.facing || 0;
     this.baseFacing = this.facing;
@@ -149,6 +158,7 @@ export class Chest extends Base {
     super(game, data);
     this.id = data.id;
     this.mesh = P.buildChest({ big: data.big });
+    outlineAll(this.mesh, 0.035);
     this.root.add(this.mesh);
     this.root.rotation.y = data.facing || 0;
     this.opened = game.progress.flags.has(`chest_${this.id}`);
@@ -201,6 +211,7 @@ export class Door extends Base {
     const width = span * TILE;
     const keyColor = data.requires?.item ? ITEMS[data.requires.item].color : 0xc9a227;
     this.mesh = P.buildGate({ width, color: keyColor, style: data.style || 'wood' });
+    outlineAll(this.mesh, 0.04);
     this.root.add(this.mesh);
     this.open = game.progress.flags.has(`opened_${this.id}`);
     this.collider = game.zone.collision.addBox(this.x, this.z, width, TILE * 0.5, { tall: true, tag: 'door', height: 4.5 });
@@ -256,6 +267,7 @@ export class Sign extends Base {
   constructor(game, data) {
     super(game, data);
     this.mesh = P.buildSign();
+    outlineAll(this.mesh, 0.035);
     this.root.add(this.mesh);
     this.root.rotation.y = data.facing || 0;
     game.zone.collision.addCircle(this.x, this.z, 0.4);
@@ -330,6 +342,7 @@ export class Dummy extends Base {
     super(game, data);
     this.id = data.id;
     this.mesh = P.buildDummy();
+    outlineAll(this.mesh, 0.035);
     this.root.add(this.mesh);
     game.zone.collision.addCircle(this.x, this.z, 0.5);
     this.wobble = 0;
@@ -366,6 +379,7 @@ export class Portal extends Base {
   constructor(game, data) {
     super(game, data);
     this.mesh = P.buildPortal(game.zone.palette);
+    outlineAll(this.mesh, 0.04);
     this.root.add(this.mesh);
     this.radius = 2.2;
     this.width = (data.span || 1) * TILE;

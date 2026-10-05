@@ -7,9 +7,16 @@ import { Collision } from './Collision.js';
 import * as P from './Props.js';
 import { buildSky, buildClouds, buildMountains, buildWater } from './Sky.js';
 import { rng, hash2 } from '../core/utils.js';
+import { buildGrass } from './Grass.js';
+import { windMat, instancedOutline, addOutline } from '../gfx/ModelKit.js';
 
 export class Zone {
-  constructor(data) {
+  /**
+   * @param {object} data datos de la zona
+   * @param {{high?: boolean}} quality alta = contornos en el entorno y más hierba
+   */
+  constructor(data, quality = { high: true }) {
+    this.quality = quality;
     this.data = data;
     this.id = data.id;
     this.palette = data.palette;
@@ -27,6 +34,7 @@ export class Zone {
       }
     }
 
+    this.isIce = data.map.some((row) => row.includes('i'));
     this.terrain = new Terrain(this);
     this.group.add(this.terrain.mesh);
     this.collision = new Collision(this);
@@ -47,6 +55,8 @@ export class Zone {
 
   height(x, z) { return this.terrain.height(x, z); }
 
+  isIceTile(c, r) { return !!tileInfo(this.charAt(c, r)).ice; }
+
   buildEnvironment() {
     const pal = this.palette;
     this.sky = buildSky(pal);
@@ -65,7 +75,7 @@ export class Zone {
     // agua (solo visible donde el terreno está hundido)
     const hasWater = this.map.some((row) => /[~B]/.test(row));
     if (hasWater) {
-      const water = buildWater(this.W * TILE, this.H * TILE, pal);
+      const water = buildWater(this.W * TILE, this.H * TILE, pal, this.terrain, -0.55);
       water.position.y = -0.55;
       this.group.add(water);
       this.updaters.push((t) => water.userData.update(t));
@@ -77,7 +87,8 @@ export class Zone {
   /** Recorre el mapa y genera las mallas instanciadas por tipo de objeto. */
   buildTiles() {
     const pal = this.palette;
-    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [] };
+    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [] };
+    const rockWalls = this.data.wallStyle === 'rock';
     const r = rng(this.data.terrain?.seed ?? 1);
     this.bushIndex = new Map(); // "c,r" -> índice de instancia
     const flowerColors = [0xff6b9a, 0xffe14d, 0xffffff, 0x9b7bff, 0xff9a3c];
@@ -98,6 +109,11 @@ export class Zone {
           case 'rock': lists.rock.push({ x: x + jx * 0.5, y: y - 0.1, z: z + jz * 0.5, ry: rot, s: sc }); break;
           case 'bush': this.bushIndex.set(`${c},${row}`, lists.bush.length); lists.bush.push({ x, y, z, ry: rot, s: sc * 0.95 }); break;
           case 'wall': {
+            if (rockWalls) {
+              // muro de roca/hielo: los secretos se ven casi iguales (un tono más claro)
+              lists.cliff.push({ x, y: y - 0.3, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, sy: 0.85 + hash2(c, row, 6) * 0.4, tint: info.secret ? 1.07 : 1, secret: info.secret });
+              break;
+            }
             const target = info.secret ? lists.secret : lists.wall;
             target.push({ x, y: y - 0.2, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, sy: 0.9 + hash2(c, row, 6) * 0.4 });
             const tt = info.secret ? lists.secretTree : lists.wallTree;
@@ -114,6 +130,8 @@ export class Zone {
             break;
           }
           case 'bridge': lists.bridge.push({ x, y: -0.35, z, ry: 0 }); break;
+          case 'crystal': lists.crystal.push({ x: x + jx * 0.5, y, z: z + jz * 0.5, ry: rot, s: sc }); this.torches.push({ x, z, y: y + 1.4, phase: rot, color: this.palette.crystalLight ?? 0x7fd8ff, crystal: true, obj: { userData: {} } }); break;
+          case 'icepillar': lists.icepillar.push({ x, y: y - 0.1, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, sy: 0.9 + hash2(c, row, 6) * 0.3 }); break;
           default: break;
         }
         if (occ) continue;
@@ -129,28 +147,41 @@ export class Zone {
       }
     }
 
-    const add = (geo, mat, items, opt) => {
+    const high = this.quality.high;
+    const add = (geo, mat, items, opt = {}) => {
       if (!items.length) return null;
       const m = P.instanced(geo, mat, items, opt);
       this.group.add(m);
+      // contornos de tinta (solo calidad alta)
+      if (high && opt.outline) this.group.add(instancedOutline(m, opt.outline, opt.wind || null));
       return m;
     };
     const tm = P.toonMat();
-    add(P.treeGeo(pal), tm, lists.tree);
-    add(P.pineGeo(pal), tm, lists.pine);
-    add(P.rockGeo(pal), tm, lists.rock);
-    this.bushMesh = add(P.bushGeo(pal), tm, lists.bush);
-    add(P.hedgeGeo(pal), tm, lists.wall);
-    add(this.data.wallStyle === 'forest' ? P.pineGeo(pal) : P.treeGeo(pal), tm, lists.wallTree);
+    const treeWind = { from: 2.2, amount: 0.05 };
+    const pineWind = { from: 1.6, amount: 0.04 };
+    const bushWind = { from: 0.3, amount: 0.05 };
+    const lowWind = { from: 0.0, amount: 0.25 };
+    add(P.treeGeo(pal), windMat(tm, treeWind), lists.tree, { outline: 0.05, wind: treeWind });
+    add(P.pineGeo(pal), windMat(tm, pineWind), lists.pine, { outline: 0.05, wind: pineWind });
+    add(P.rockGeo(pal), tm, lists.rock, { outline: 0.05 });
+    this.bushMesh = add(P.bushGeo(pal), windMat(tm, bushWind), lists.bush, { outline: 0.045, wind: bushWind });
+    add(P.hedgeGeo(pal), tm, lists.wall, { outline: 0.05 });
+    const wallTreeGeo = this.data.wallStyle === 'forest' ? P.pineGeo(pal) : P.treeGeo(pal);
+    const wallWind = this.data.wallStyle === 'forest' ? pineWind : treeWind;
+    add(wallTreeGeo, windMat(tm, wallWind), lists.wallTree, { outline: 0.05, wind: wallWind });
     // los pasadizos secretos se ven igual que un muro... casi (un tono más claro)
-    add(P.hedgeGeo(pal), tm, lists.secret.map((i) => ({ ...i, tint: 1.08 })), { castShadow: true });
-    add(this.data.wallStyle === 'forest' ? P.pineGeo(pal) : P.treeGeo(pal), tm, lists.secretTree);
-    add(P.cliffGeo(pal), tm, lists.cliff);
-    add(P.fenceGeo(pal, true), tm, lists.fenceX);
-    add(P.fenceGeo(pal, false), tm, lists.fenceZ);
-    add(P.flowerGeo(), tm, lists.flowers, { castShadow: false });
-    add(P.grassTuftGeo(pal), tm, lists.tufts, { castShadow: false });
-    add(P.bridgeGeo(pal), tm, lists.bridge);
+    add(P.hedgeGeo(pal), tm, lists.secret.map((i) => ({ ...i, tint: 1.08 })), { outline: 0.05 });
+    add(wallTreeGeo, windMat(tm, wallWind), lists.secretTree, { outline: 0.05, wind: wallWind });
+    add(P.cliffGeo(pal), tm, lists.cliff, { outline: 0.05 });
+    add(P.fenceGeo(pal, true), tm, lists.fenceX, { outline: 0.03 });
+    add(P.fenceGeo(pal, false), tm, lists.fenceZ, { outline: 0.03 });
+    add(P.flowerGeo(), windMat(tm, lowWind), lists.flowers, { castShadow: false });
+    add(P.grassTuftGeo(pal), windMat(tm, lowWind), lists.tufts, { castShadow: false });
+    add(P.bridgeGeo(pal), tm, lists.bridge, { outline: 0.03 });
+    add(P.crystalGeo(pal), P.toonMat({ emissive: new THREE.Color(pal.crystalGlow ?? 0x2a6f8f) }), lists.crystal, { outline: 0.03 });
+    add(P.icePillarGeo(pal), tm, lists.icepillar, { outline: 0.05 });
+    // hierba con viento
+    if (pal.grassDensity !== 0) this.group.add(buildGrass(this, Math.round((pal.grassDensity ?? 48) * (high ? 1 : 0.4))));
   }
 
   /** Corta un arbusto: quita su instancia y su colisión. */
@@ -171,6 +202,9 @@ export class Zone {
         const w = e.size[0] * TILE, d = e.size[1] * TILE;
         const [cx, cz] = this.tileToWorld(e.tile[0] + (e.size[0] - 1) / 2, e.tile[1] + (e.size[1] - 1) / 2);
         const house = P.buildHouse({ w: w - 0.6, d: d - 1.0, roof: e.roof, wall: e.wall, door: e.door });
+        const houseMeshes = [];
+        house.traverse((o) => { if (o.isMesh) houseMeshes.push(o); });
+        houseMeshes.forEach((m) => addOutline(m, 0.05));
         house.position.set(cx, this.minHeight(cx, cz, w / 2, d / 2) - 0.1, cz);
         this.group.add(house);
         this.collision.addBox(cx, cz, w - 0.4, d - 0.8, { tall: true, tag: 'house' });
@@ -194,13 +228,16 @@ export class Zone {
         obj.rotation.y = e.rot || 0;
         const fire = this.torches.find((t) => t.obj === obj);
         if (fire) { fire.x = x; fire.z = z; fire.y = obj.position.y + 0.9; }
-        obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        const meshes = [];
+        obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material.type !== 'MeshBasicMaterial') meshes.push(o); } });
+        meshes.forEach((m) => addOutline(m, 0.04));
         this.group.add(obj);
         if (e.radius) this.collision.addCircle(x, z, e.radius, { tall: false });
         if (e.box) this.collision.addBox(x, z, e.box[0], e.box[1], { tall: false });
       } else if (e.type === 'torch') {
         const [x, z] = this.tileToWorld(...e.tile);
         const t = P.buildTorch(pal);
+        t.children.forEach((m) => { if (m.isMesh && m.material.type !== 'MeshBasicMaterial') addOutline(m, 0.03); });
         t.position.set(x, this.height(x, z), z);
         this.group.add(t);
         this.collision.addCircle(x, z, 0.3);

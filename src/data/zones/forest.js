@@ -4,9 +4,9 @@
 // Generado/editado con tools/genmaps.py.
 
 const LOOKS = {
-  iria: { tunic: 0x6b705c, hair: 0xb5651d, hat: 0x386641, hatStyle: 'hood', pants: 0x3a3a2a, shield: false },
-  lenador: { tunic: 0xbc4749, hair: 0x5e3023, hatStyle: 'none', pants: 0x3d405b, beard: 0x5e3023, scale: 1.12 },
-  ermitano: { tunic: 0x8d6e63, hair: 0xdddddd, hat: 0x5d4037, hatStyle: 'hood', beard: 0xdddddd, pants: 0x4e342e },
+  iria: { tunic: 0x6b705c, hair: 0xb5651d, hat: 0x386641, hatStyle: 'hood', pants: 0x3a3a2a, shield: false, face: 'girl', eyes: '#2f7d4a', cape: 0x386641 },
+  lenador: { tunic: 0xbc4749, hair: 0x5e3023, hatStyle: 'none', pants: 0x3d405b, beard: 0x5e3023, scale: 1.12, face: 'npc', eyes: '#3a2a1a' },
+  ermitano: { tunic: 0x8d6e63, hair: 0xdddddd, hat: 0x5d4037, hatStyle: 'hood', beard: 0xdddddd, pants: 0x4e342e, face: 'old' },
 };
 
 export default {

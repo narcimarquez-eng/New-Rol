@@ -46,6 +46,9 @@ export class Combat {
       g.shake(0.12);
     }
 
+    // la espada destruye proyectiles
+    g.projectiles.slash((x, z, r) => inArc(x, z, r));
+
     for (const d of g.dummies) {
       if (p.hitSet.has(d) || !inArc(d.x, d.z, 0.5)) continue;
       p.hitSet.add(d);
@@ -83,7 +86,10 @@ export class Combat {
       g.particles.spawn(x + Math.cos(a) * 0.5, g.zone.height(x, z) + 0.3, z + Math.sin(a) * 0.5, { vx: Math.cos(a) * radius * 2.2, vz: Math.sin(a) * radius * 2.2, vy: 1.5, life: 0.45, size: 1.6, color: 0xd9b26f, gravity: 4, drag: 2 });
     }
     const p = g.player;
-    if (Math.hypot(p.x - x, p.z - z) < radius) p.takeDamage(dmg, src.x, src.z, 11);
+    if (Math.hypot(p.x - x, p.z - z) < radius) {
+      const r = p.takeDamage(dmg, src.x, src.z, 11);
+      if (r === 'hit' && src.def?.freeze) p.chill(src.def.freeze);
+    }
   }
 
   /** Evita que los enemigos se amontonen entre sí y con el jugador. */

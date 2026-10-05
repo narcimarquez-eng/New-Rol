@@ -3,10 +3,13 @@
 // (un draw call por tipo de objeto en toda la zona).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { spart, smerge, rockify, gradientMap as kitGradient } from '../gfx/ModelKit.js';
 
 // ---------- materiales compartidos ----------
 let gradientMap = null;
 function getGradient() {
+  if (gradientMap) return gradientMap;
+  gradientMap = kitGradient();
   if (gradientMap) return gradientMap;
   const data = new Uint8Array([90, 90, 90, 255, 170, 170, 170, 255, 255, 255, 255, 255]);
   gradientMap = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
@@ -89,56 +92,95 @@ export function hideInstance(mesh, i) {
 }
 
 // ---------- geometrías instanciables ----------
+// Formas orgánicas: copas redondeadas y deformadas, rocas facetadas con ruido,
+// colores con oscurecimiento inferior (oclusión falsa) para dar volumen.
 export function treeGeo(pal) {
-  return merge([
-    part(new THREE.CylinderGeometry(0.25, 0.4, 2.4, 6), pal.trunk, { y: 1.2 }),
-    part(new THREE.IcosahedronGeometry(1.7, 0), pal.leaf, { y: 3.4 }),
-    part(new THREE.IcosahedronGeometry(1.2, 0), pal.leaf2, { x: 0.8, y: 4.1, z: 0.3 }),
-    part(new THREE.IcosahedronGeometry(1.1, 0), pal.leaf2, { x: -0.8, y: 3.8, z: -0.4 }),
+  return smerge([
+    spart(new THREE.CylinderGeometry(0.22, 0.42, 2.6, 8), pal.trunk, { y: 1.3, ao: 0.35 }),
+    spart(new THREE.ConeGeometry(0.55, 0.6, 8), pal.trunk, { y: 0.25, ao: 0.4 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.75, 1), 0.12, 2), pal.leaf, { y: 3.5, sy: 0.9, ao: 0.45 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.25, 1), 0.12, 3), pal.leaf2, { x: 0.85, y: 4.15, z: 0.35, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.15, 1), 0.12, 4), pal.leaf2, { x: -0.85, y: 3.85, z: -0.4, ao: 0.35 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.95, 1), 0.12, 5), pal.leaf, { x: 0.1, y: 4.75, z: -0.2, ao: 0.2 }),
   ]);
 }
 
 export function pineGeo(pal) {
-  return merge([
-    part(new THREE.CylinderGeometry(0.22, 0.35, 1.6, 6), pal.trunk, { y: 0.8 }),
-    part(new THREE.ConeGeometry(1.8, 2.4, 7), pal.pine, { y: 2.4 }),
-    part(new THREE.ConeGeometry(1.4, 2.1, 7), pal.pine2, { y: 3.6 }),
-    part(new THREE.ConeGeometry(0.9, 1.8, 7), pal.pine, { y: 4.7 }),
-  ]);
+  const parts = [
+    spart(new THREE.CylinderGeometry(0.2, 0.36, 1.8, 8), pal.trunk, { y: 0.9, ao: 0.35 }),
+    spart(new THREE.ConeGeometry(1.85, 2.3, 9), pal.pine, { y: 2.3, ao: 0.5 }),
+    spart(new THREE.ConeGeometry(1.45, 2.0, 9), pal.pine2, { y: 3.5, ry: 0.3, ao: 0.4 }),
+    spart(new THREE.ConeGeometry(0.95, 1.7, 9), pal.pine, { y: 4.6, ry: 0.6, ao: 0.3 }),
+  ];
+  if (pal.pineSnow) {
+    parts.push(spart(new THREE.ConeGeometry(1.0, 0.75, 9), pal.pineSnow, { y: 2.95, ao: 0 }));
+    parts.push(spart(new THREE.ConeGeometry(0.75, 0.65, 9), pal.pineSnow, { y: 4.05, ry: 0.3, ao: 0 }));
+    parts.push(spart(new THREE.ConeGeometry(0.5, 0.75, 9), pal.pineSnow, { y: 5.15, ry: 0.6, ao: 0 }));
+  }
+  return smerge(parts);
 }
 
 export function rockGeo(pal) {
-  return merge([
-    part(new THREE.DodecahedronGeometry(1.2, 0), pal.rock, { y: 0.5, sy: 0.75 }),
-    part(new THREE.DodecahedronGeometry(0.6, 0), pal.rock2, { x: 0.9, y: 0.3, z: 0.4 }),
-  ]);
+  const parts = [
+    spart(rockify(new THREE.IcosahedronGeometry(1.2, 1), 0.2, 6), pal.rock, { y: 0.45, sy: 0.72, ao: 0.4, flat: true }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.6, 1), 0.2, 7), pal.rock2, { x: 0.95, y: 0.25, z: 0.45, ao: 0.3, flat: true }),
+  ];
+  if (pal.rockMoss) parts.push(spart(rockify(new THREE.IcosahedronGeometry(1.05, 1), 0.15, 6), pal.rockMoss, { y: 0.78, sy: 0.25, ao: 0, flat: true }));
+  return smerge(parts);
 }
 
 export function bushGeo(pal) {
-  return merge([
-    part(new THREE.IcosahedronGeometry(1.1, 0), pal.bush, { y: 0.8, sy: 0.8 }),
-    part(new THREE.IcosahedronGeometry(0.8, 0), pal.leaf2, { x: 0.6, y: 1.2, z: 0.2 }),
-    part(new THREE.IcosahedronGeometry(0.7, 0), pal.bush, { x: -0.6, y: 1.0, z: -0.3 }),
+  return smerge([
+    spart(rockify(new THREE.IcosahedronGeometry(1.1, 1), 0.12, 8), pal.bush, { y: 0.75, sy: 0.8, ao: 0.45 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.8, 1), 0.12, 9), pal.leaf2, { x: 0.6, y: 1.15, z: 0.2, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(0.7, 1), 0.12, 10), pal.bush, { x: -0.6, y: 1.0, z: -0.3, ao: 0.3 }),
   ]);
 }
 
 /** Bloque de muro de bosque/seto: base densa que ocupa la casilla entera. */
 export function hedgeGeo(pal) {
-  return merge([
-    part(new THREE.BoxGeometry(4, 3, 4), pal.hedge, { y: 1.5 }),
-    part(new THREE.IcosahedronGeometry(1.6, 0), pal.hedge2, { x: -1, y: 3, z: -1 }),
-    part(new THREE.IcosahedronGeometry(1.6, 0), pal.hedge2, { x: 1, y: 3.2, z: 1 }),
-    part(new THREE.IcosahedronGeometry(1.4, 0), pal.hedge, { x: 1, y: 2.9, z: -1.1 }),
-    part(new THREE.IcosahedronGeometry(1.4, 0), pal.hedge, { x: -1.1, y: 3.1, z: 1 }),
+  return smerge([
+    spart(new THREE.BoxGeometry(4, 3, 4, 2, 2, 2), pal.hedge, { y: 1.5, ao: 0.5 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.6, 1), 0.12, 11), pal.hedge2, { x: -1, y: 3, z: -1, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.6, 1), 0.12, 12), pal.hedge2, { x: 1, y: 3.2, z: 1, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.4, 1), 0.12, 13), pal.hedge, { x: 1, y: 2.9, z: -1.1, ao: 0.3 }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.4, 1), 0.12, 14), pal.hedge, { x: -1.1, y: 3.1, z: 1, ao: 0.3 }),
   ]);
 }
 
+/** Pared de roca estratificada con cima cubierta (hierba o nieve). */
 export function cliffGeo(pal) {
-  return merge([
-    part(new THREE.BoxGeometry(4, 5, 4), pal.rock, { y: 2.5 }),
-    part(new THREE.DodecahedronGeometry(1.6, 0), pal.rock2, { x: -1, y: 5, z: 0.8 }),
-    part(new THREE.DodecahedronGeometry(1.4, 0), pal.rock, { x: 1.1, y: 5.3, z: -0.7 }),
-    part(new THREE.BoxGeometry(4.2, 0.4, 4.2), pal.cliffTop || pal.leaf, { y: 6 }),
+  const parts = [
+    spart(rockify(new THREE.BoxGeometry(4.2, 2.6, 4.2, 3, 2, 3), 0.25, 15), pal.rock, { y: 1.3, ao: 0.45, flat: true }),
+    spart(rockify(new THREE.BoxGeometry(3.9, 2.4, 3.9, 3, 2, 3), 0.25, 16), pal.rock2, { y: 3.6, ao: 0.25, flat: true }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.5, 1), 0.2, 17), pal.rock, { x: -0.9, y: 5.0, z: 0.7, ao: 0.2, flat: true }),
+    spart(rockify(new THREE.IcosahedronGeometry(1.3, 1), 0.2, 18), pal.rock2, { x: 1.0, y: 5.1, z: -0.7, ao: 0.2, flat: true }),
+    spart(rockify(new THREE.BoxGeometry(4.3, 0.5, 4.3, 3, 1, 3), 0.12, 19), pal.cliffTop || pal.leaf, { y: 5.95, ao: 0, flat: true }),
+  ];
+  if (pal.cliffIce) {
+    parts.push(spart(new THREE.ConeGeometry(0.35, 1.6, 5), pal.cliffIce, { x: 1.4, y: 1.2, z: 1.4, rz: 0.3, ao: 0, flat: true }));
+    parts.push(spart(new THREE.ConeGeometry(0.25, 1.1, 5), pal.cliffIce, { x: -1.5, y: 2.4, z: 1.2, rz: -0.4, ao: 0, flat: true }));
+  }
+  return smerge(parts);
+}
+
+/** Racimo de cristales de hielo luminosos. */
+export function crystalGeo(pal) {
+  const c = pal.crystal ?? 0x9fe7ff, c2 = pal.crystal2 ?? 0xd6f7ff;
+  return smerge([
+    spart(rockify(new THREE.IcosahedronGeometry(0.7, 0), 0.1, 20), pal.rock2, { y: 0.2, sy: 0.5, ao: 0.3, flat: true }),
+    spart(new THREE.OctahedronGeometry(0.45, 0), c, { y: 1.3, sy: 2.6, ao: -0.3, flat: true }),
+    spart(new THREE.OctahedronGeometry(0.3, 0), c2, { x: 0.5, y: 0.9, z: 0.2, sy: 2.2, rz: -0.4, ao: -0.3, flat: true }),
+    spart(new THREE.OctahedronGeometry(0.28, 0), c, { x: -0.45, y: 0.8, z: -0.25, sy: 2.0, rz: 0.45, ao: -0.3, flat: true }),
+  ]);
+}
+
+/** Pilar de hielo (obstáculo de los puzles deslizantes). */
+export function icePillarGeo(pal) {
+  return smerge([
+    spart(rockify(new THREE.CylinderGeometry(1.5, 1.8, 3.4, 7, 2), 0.12, 21), pal.icePillar ?? 0xa8e6ff, { y: 1.7, ao: 0.35, flat: true }),
+    spart(new THREE.ConeGeometry(1.2, 1.4, 7), pal.icePillar2 ?? 0xd8f6ff, { y: 4.1, ao: 0, flat: true }),
+    spart(new THREE.CylinderGeometry(1.6, 1.6, 0.3, 7), pal.pineSnow ?? 0xffffff, { y: 3.45, ao: 0, flat: true }),
   ]);
 }
 
@@ -155,9 +197,15 @@ export function fenceGeo(pal, alongX) {
 }
 
 export function flowerGeo() {
-  return merge([
-    part(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 3), 0x3f8f3a, { y: 0.2 }),
-    part(new THREE.OctahedronGeometry(0.14, 0), 0xffffff, { y: 0.45 }),
+  const petals = [];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    petals.push(spart(new THREE.SphereGeometry(0.09, 6, 4), 0xffffff, { x: Math.cos(a) * 0.1, y: 0.48, z: Math.sin(a) * 0.1, sy: 0.5, ao: 0 }));
+  }
+  return smerge([
+    spart(new THREE.CylinderGeometry(0.025, 0.03, 0.46, 4), 0x3f8f3a, { y: 0.23, ao: 0.3 }),
+    spart(new THREE.SphereGeometry(0.07, 6, 4), 0xffe14d, { y: 0.5, ao: 0 }),
+    ...petals,
   ]);
 }
 

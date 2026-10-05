@@ -4,13 +4,13 @@
 // Generado/editado con tools/genmaps.py.
 
 const NPC_LOOKS = {
-  elder: { tunic: 0x6a4c93, hair: 0xeeeeee, hat: 0x6a4c93, hatStyle: 'hood', beard: 0xeeeeee, pants: 0x4b3a6b },
-  lucia: { tunic: 0xe76f51, hair: 0x6b3e26, hatStyle: 'bun', pants: 0xf4e1c1, apron: 0xffffff },
-  farmer: { tunic: 0x588157, hair: 0x7f5539, hat: 0xe9c46a, hatStyle: 'straw', pants: 0x3a5a40, beard: 0x7f5539 },
-  smith: { tunic: 0x6c757d, hair: 0x222222, hatStyle: 'none', pants: 0x343a40, apron: 0x5a3a22, beard: 0x222222, scale: 1.1 },
-  merchant: { tunic: 0xf4a261, hair: 0xa8552a, hat: 0x2a9d8f, hatStyle: 'hood', pants: 0x264653 },
-  kid: { tunic: 0x4895ef, hair: 0x3a2a1a, hatStyle: 'none', pants: 0x1d3557, scale: 0.75 },
-  guard: { tunic: 0x9d0208, hair: 0x222222, hat: 0x8d99ae, hatStyle: 'hood', pants: 0x2b2d42, shield: true, shieldColor: 0x9d0208 },
+  elder: { tunic: 0x6a4c93, hair: 0xeeeeee, hat: 0x6a4c93, hatStyle: 'hood', beard: 0xeeeeee, pants: 0x4b3a6b, face: 'old', staff: 0x9fe7ff },
+  lucia: { tunic: 0xe76f51, hair: 0x6b3e26, hatStyle: 'bun', pants: 0xf4e1c1, apron: 0xffffff, face: 'girl', eyes: '#3a7d44' },
+  farmer: { tunic: 0x588157, hair: 0x7f5539, hat: 0xe9c46a, hatStyle: 'straw', pants: 0x3a5a40, beard: 0x7f5539, face: 'npc', eyes: '#5a3a22' },
+  smith: { tunic: 0x6c757d, hair: 0x222222, hatStyle: 'none', pants: 0x343a40, apron: 0x5a3a22, beard: 0x222222, scale: 1.1, face: 'npc', eyes: '#3a2a1a', skin: 0xe0a97e },
+  merchant: { tunic: 0xf4a261, hair: 0xa8552a, hat: 0x2a9d8f, hatStyle: 'hood', pants: 0x264653, face: 'girl', eyes: '#7a4b2a' },
+  kid: { tunic: 0x4895ef, hair: 0x3a2a1a, hatStyle: 'none', pants: 0x1d3557, scale: 0.75, face: 'kid', eyes: '#3a2a1a' },
+  guard: { tunic: 0x9d0208, hair: 0x222222, hat: 0xb0b8c4, hatStyle: 'helmet', pants: 0x2b2d42, shield: true, shieldColor: 0x9d0208, face: 'npc', eyes: '#2b2118' },
 };
 
 export default {

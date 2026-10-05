@@ -3,7 +3,7 @@
 // así los personajes siempre pisan la superficie visible.
 import * as THREE from 'three';
 import { TILE, tileInfo } from './tiles.js';
-import { fbm, hash2 } from '../core/utils.js';
+import { fbm } from '../core/utils.js';
 
 const SUB = 2; // vértices por casilla (resolución)
 
@@ -62,34 +62,84 @@ export class Terrain {
   }
 
   buildMesh(palette) {
-    const pos = [], col = [];
-    const c = new THREE.Color();
-    const pushTri = (ax, az, bx, bz, cx, cz, ah, bh, chh) => {
-      pos.push(ax, ah, az, bx, bh, bz, cx, chh, cz);
-      // color de cara según la casilla del baricentro + variación
-      const mx = (ax + bx + cx) / 3, mz = (az + bz + cz) / 3;
-      const tc = Math.floor((mx - this.originX) / TILE), tr = Math.floor((mz - this.originZ) / TILE);
-      const info = tileInfo(this.zone.charAt(tc, tr));
-      c.set(palette.ground[info.ground] || palette.ground.grass);
-      const jit = (hash2(Math.floor(mx * 3), Math.floor(mz * 3), 7) - 0.5) * 0.08;
-      c.offsetHSL(0, 0, jit);
-      for (let k = 0; k < 3; k++) col.push(c.r, c.g, c.b);
+    // malla indexada (sombreado suave) con colores por vértice mezclados entre
+    // casillas vecinas, oclusión ambiental "horneada" junto a muros y detalle
+    // de ruido en el sombreador.
+    const VW = this.VW, VH = this.VH;
+    const pos = new Float32Array(VW * VH * 3);
+    const col = new Float32Array(VW * VH * 3);
+    const c = new THREE.Color(), acc = new THREE.Color();
+    const zone = this.zone;
+    const colorAt = (x, z) => {
+      const tc = Math.floor((x - this.originX) / TILE), tr = Math.floor((z - this.originZ) / TILE);
+      const info = tileInfo(zone.charAt(tc, tr));
+      return palette.ground[info.ground] ?? palette.ground.grass;
     };
-    for (let j = 0; j < this.VH - 1; j++) {
-      for (let i = 0; i < this.VW - 1; i++) {
-        const x0 = this.originX + i * this.step, z0 = this.originZ + j * this.step;
-        const x1 = x0 + this.step, z1 = z0 + this.step;
-        const h00 = this.vh(i, j), h10 = this.vh(i + 1, j), h01 = this.vh(i, j + 1), h11 = this.vh(i + 1, j + 1);
-        // mismo orden que height(): (00,01,10) y (10,01,11), con cara hacia arriba
-        pushTri(x0, z0, x0, z1, x1, z0, h00, h01, h10);
-        pushTri(x1, z0, x0, z1, x1, z1, h10, h01, h11);
+    const solidTall = (tc, tr) => {
+      const info = tileInfo(zone.charAt(tc, tr));
+      return info.solid === 'box' && info.tall;
+    };
+    for (let j = 0; j < VH; j++) {
+      for (let i = 0; i < VW; i++) {
+        const x = this.originX + i * this.step, z = this.originZ + j * this.step;
+        const k = j * VW + i;
+        pos[k * 3] = x; pos[k * 3 + 1] = this.heights[k]; pos[k * 3 + 2] = z;
+        // mezcla de 5 muestras alrededor del vértice
+        acc.setRGB(0, 0, 0);
+        for (const [ox, oz, w] of [[0, 0, 0.4], [1.2, 0, 0.15], [-1.2, 0, 0.15], [0, 1.2, 0.15], [0, -1.2, 0.15]]) {
+          c.set(colorAt(x + ox, z + oz));
+          acc.r += c.r * w; acc.g += c.g * w; acc.b += c.b * w;
+        }
+        // variación suave de tono a gran escala
+        const n = fbm(x * 0.06, z * 0.06, 31, 2) - 0.5;
+        acc.offsetHSL(n * 0.03, n * 0.1, n * 0.08);
+        // oclusión junto a muros altos
+        const tc = Math.floor((x - this.originX) / TILE), tr = Math.floor((z - this.originZ) / TILE);
+        let ao = 0;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+          if (!solidTall(tc + dc, tr + dr)) continue;
+          const bx0 = this.originX + (tc + dc) * TILE, bz0 = this.originZ + (tr + dr) * TILE;
+          const ddx = Math.max(bx0 - x, 0, x - (bx0 + TILE)), ddz = Math.max(bz0 - z, 0, z - (bz0 + TILE));
+          ao += Math.max(0, 1 - Math.hypot(ddx, ddz) / 2.6);
+        }
+        const shade = 1 - Math.min(1, ao) * 0.38;
+        col[k * 3] = acc.r * shade; col[k * 3 + 1] = acc.g * shade; col[k * 3 + 2] = acc.b * shade;
+      }
+    }
+    const idx = [];
+    for (let j = 0; j < VH - 1; j++) {
+      for (let i = 0; i < VW - 1; i++) {
+        const a = j * VW + i, b = a + 1, d = a + VW, e = d + 1;
+        // mismo orden que height(): (00,01,10) y (10,01,11)
+        idx.push(a, d, b, b, d, e);
       }
     }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(idx);
     geo.computeVertexNormals();
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    mat.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace(
+        '#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+      );
+      sh.fragmentShader = `varying vec3 vWPos;
+        float tHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float tNoise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(tHash(i), tHash(i + vec2(1, 0)), u.x), mix(tHash(i + vec2(0, 1)), tHash(i + vec2(1, 1)), u.x), u.y);
+        }
+      ` + sh.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        float tn = tNoise(vWPos.xz * 0.45) * 0.6 + tNoise(vWPos.xz * 1.9) * 0.4;
+        diffuseColor.rgb *= 0.9 + tn * 0.17;`,
+      );
+    };
+    mat.customProgramCacheKey = () => 'terrain-v2';
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     mesh.name = 'terrain';

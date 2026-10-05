@@ -38,12 +38,12 @@ export class CameraController {
 
     // ---- recolocación automática detrás del jugador al moverse ----
     if (talk) {
-      // diálogo: plano lateral que encuadra al jugador y al NPC
-      const ang = Math.atan2(talk.x - player.pos.x, talk.z - player.pos.z) + Math.PI / 2;
-      const a1 = ang, a2 = ang + Math.PI;
+      // diálogo: plano por encima del hombro del jugador, mirando la cara del NPC
+      const back = Math.atan2(player.pos.x - talk.x, player.pos.z - talk.z);
+      const a1 = back + 0.55, a2 = back - 0.55;
       const pick = Math.abs(Math.atan2(Math.sin(a1 - this.yaw), Math.cos(a1 - this.yaw))) < Math.abs(Math.atan2(Math.sin(a2 - this.yaw), Math.cos(a2 - this.yaw))) ? a1 : a2;
-      this.yaw = dampAngle(this.yaw, pick, 3, dt);
-      this.pitch = damp(this.pitch, 0.22, 3, dt);
+      this.yaw = dampAngle(this.yaw, pick, 4, dt);
+      this.pitch = damp(this.pitch, 0.18, 3, dt);
       this.idleLook = 0;
     } else if (focus) {
       // con un objetivo (jefe), encuadra a ambos
@@ -55,7 +55,7 @@ export class CameraController {
 
     // ---- objetivo suavizado ----
     let tx = player.pos.x, ty = player.pos.y + 1.6, tz = player.pos.z;
-    if (talk) { tx = (tx + talk.x) / 2; tz = (tz + talk.z) / 2; }
+    if (talk) { tx = tx * 0.35 + talk.x * 0.65; tz = tz * 0.35 + talk.z * 0.65; ty -= 0.2; }
     this.target.x = damp(this.target.x, tx, 14, dt);
     this.target.y = damp(this.target.y, ty, 10, dt);
     this.target.z = damp(this.target.z, tz, 14, dt);
@@ -63,9 +63,10 @@ export class CameraController {
     // ---- colisión: acortar la distancia si algo bloquea ----
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     const dirX = Math.sin(this.yaw) * cp, dirY = sp, dirZ = Math.cos(this.yaw) * cp;
-    let allowed = this.distance;
+    const wanted = talk ? Math.min(this.distance, 6.5) : this.distance;
+    let allowed = wanted;
     const step = 0.25;
-    for (let d = 0.6; d <= this.distance; d += step) {
+    for (let d = 0.6; d <= wanted; d += step) {
       const x = this.target.x + dirX * d, y = this.target.y + dirY * d, z = this.target.z + dirZ * d;
       const ground = zone.height(x, z);
       if (y < ground + 0.45 || zone.collision.blocksView(x, z, y - ground)) { allowed = Math.max(0.8, d - 0.45); break; }

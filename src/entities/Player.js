@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel.js';
 import { clamp, dampAngle, angleDiff } from '../core/utils.js';
+import { TILE } from '../world/tiles.js';
 
 const RADIUS = 0.5;
 const SPEED = 7;
@@ -11,11 +12,12 @@ const ATTACK_COST = 8;
 const DODGE_COST = 22;
 const SPRINT_COST = 14; // por segundo
 const COMBO_TIMES = [0.42, 0.42, 0.58];
+const SLIDE_SPEED = 10;
 
 export class Player {
   constructor(game) {
     this.game = game;
-    this.model = new CharacterModel({ sword: true, shield: true });
+    this.model = new CharacterModel({ sword: true, shield: true, face: 'hero', ears: 'pointy', eyes: '#2f6fd0', hatStyle: 'cap' });
     this.root = this.model.root;
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector2(); // velocidad de empuje (retroceso, voltereta)
@@ -38,6 +40,8 @@ export class Player {
     this.hitSet = new Set();
     this.exhausted = false;
     this.trail = null;
+    this.chillT = 0;
+    this.slide = null; // deslizamiento sobre hielo { dir:[dc,dr], to:[c,r] }
   }
 
   get x() { return this.pos.x; }
@@ -48,18 +52,81 @@ export class Player {
     this.facing = facing;
     this.vel.set(0, 0);
     this.state = 'normal';
+    this.slide = null;
+    this.chillT = 0;
     this.root.position.copy(this.pos);
     this.root.rotation.y = facing;
   }
 
-  setSwordGlow(on) {
+  setSwordGlow(on, color = 0x8fe3ff) {
     if (!this.model.weapon) return;
     if (on && !this.swordGlow) {
-      const glow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.2, 0.08), new THREE.MeshBasicMaterial({ color: 0x8fe3ff, transparent: true, opacity: 0.55, toneMapped: false }));
-      glow.position.y = 0.78;
+      const glow = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.1, 0.06), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity: 0.5, toneMapped: false }));
+      glow.position.y = 0.74;
       this.model.weapon.add(glow);
       this.swordGlow = glow;
+    } else if (on) this.swordGlow.material.color.set(color).multiplyScalar(1.6);
+  }
+
+  /** Congelación: ralentiza al jugador unos segundos. */
+  chill(t) {
+    this.chillT = Math.max(this.chillT, t);
+    this.model.flash(0.4, 0x7fdcff);
+    this.game.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, { count: 14, color: 0xcff6ff, speed: 3, up: 2, life: 0.6 });
+  }
+
+  /** Lógica de hielo: devuelve true si el deslizamiento controla el movimiento este frame. */
+  updateIce(dt, dx, dz, mag) {
+    const zone = this.game.zone;
+    if (!zone.isIce) return false;
+    const col = zone.collision;
+    const [c, r] = col.tileOf(this.pos.x, this.pos.z);
+    const onIce = zone.isIceTile(c, r);
+    const passable = (cc, rr) => {
+      const s = col.getSolid(cc, rr);
+      if (s && s.kind === 'box') return false;
+      const [x, z] = col.tileCenter(cc, rr);
+      return !col.blocked(x, z, 0.45);
+    };
+    if (this.slide) {
+      const [tc, tr] = this.slide.to;
+      const [tx, tz] = col.tileCenter(tc, tr);
+      const ddx = tx - this.pos.x, ddz = tz - this.pos.z;
+      const d = Math.hypot(ddx, ddz);
+      const step = SLIDE_SPEED * dt;
+      if (d <= step) {
+        this.pos.x = tx; this.pos.z = tz;
+        const [dc, dr] = this.slide.dir;
+        if (zone.isIceTile(tc, tr) && passable(tc + dc, tr + dr)) this.slide.to = [tc + dc, tr + dr];
+        else { this.slide = null; if (Math.random() < 0.5) this.game.audio.sfx('dodge'); }
+      } else {
+        this.moveBy(ddx / d * step, ddz / d * step);
+        if (Math.random() < dt * 30) this.game.particles.spawn(this.pos.x, this.pos.y + 0.1, this.pos.z, { color: 0xe8fbff, size: 0.6, life: 0.4, gravity: 1, vx: (Math.random() - 0.5) * 2, vz: (Math.random() - 0.5) * 2, vy: 1 });
+        // si el empuje no avanza (bloqueado por algo dinámico), parar
+        if (Math.hypot(this.pos.x - tx, this.pos.z - tz) > d - step * 0.3) this.slideStuck = (this.slideStuck || 0) + dt;
+        else this.slideStuck = 0;
+        if (this.slideStuck > 0.15) { this.slide = null; this.slideStuck = 0; }
+      }
+      this.speedNorm = 0.2;
+      return true;
     }
+    if (!onIce) return false;
+    // sobre hielo y quieto: la entrada (o la inercia al entrar) inicia un deslizamiento en línea recta
+    let ix = dx, iz = dz;
+    if (mag < 0.3) {
+      if (!this.iceEntryDir) return true; // quieto en el hielo
+      [ix, iz] = this.iceEntryDir;
+    }
+    this.iceEntryDir = null;
+    const horiz = Math.abs(ix) > Math.abs(iz);
+    const dir = horiz ? [Math.sign(ix), 0] : [0, Math.sign(iz)];
+    this.facing = Math.atan2(dir[0], dir[1]);
+    const [cx, cz] = col.tileCenter(c, r);
+    // alinear con el centro de la casilla en el eje perpendicular
+    if (horiz) this.pos.z = cz; else this.pos.x = cx;
+    if (passable(c + dir[0], r + dir[1])) this.slide = { dir, to: [c + dir[0], r + dir[1]] };
+    else { this.pos.x = cx; this.pos.z = cz; }
+    return true;
   }
 
   /** Dirección hacia delante según el ángulo de orientación. */
@@ -94,6 +161,7 @@ export class Player {
     const sprinting = this.state === 'normal' && !this.blocking && input.isDown('run') && mag > 0.1 && this.stamina > 1 && !this.exhausted;
 
     // ---- acciones ----
+    if (this.slide) { input.consume('attack'); input.consume('dodge'); }
     if (input.consume('attack') || (this.queuedAttack && this.state === 'normal')) {
       this.queuedAttack = false;
       if (this.state === 'attack' && this.stateT > COMBO_TIMES[this.combo] * 0.45 && this.combo < 2) {
@@ -113,12 +181,25 @@ export class Player {
 
     // ---- integración según estado ----
     let speed = 0;
-    if (this.state === 'normal') {
+    if (this.chillT > 0) {
+      this.chillT -= dt;
+      if (Math.random() < dt * 8) g.particles.spawn(this.pos.x + (Math.random() - 0.5), this.pos.y + 0.5 + Math.random(), this.pos.z + (Math.random() - 0.5), { color: 0xcff6ff, size: 0.5, life: 0.6, gravity: 1 });
+    }
+    const slow = this.chillT > 0 ? 0.55 : 1;
+    if (this.state === 'normal' && this.updateIce(dt, dx, dz, mag)) {
+      // el hielo controla el movimiento (sin atacar ni esquivar mientras se desliza)
+      if (this.slide) this.queuedAttack = false;
+    } else if (this.state === 'normal') {
       if (mag > 0.05) {
-        speed = (sprinting ? SPRINT : SPEED) * mag * (this.blocking ? 0.4 : 1);
+        speed = (sprinting ? SPRINT : SPEED) * mag * (this.blocking ? 0.4 : 1) * slow;
         if (!this.blocking) this.facing = dampAngle(this.facing, Math.atan2(dx, dz), 14, dt);
         else this.facing = dampAngle(this.facing, Math.atan2(dx, dz), 4, dt);
         this.moveBy(dx * speed * dt, dz * speed * dt);
+        // al pisar hielo se conserva la dirección para iniciar el deslizamiento
+        if (g.zone.isIce) {
+          const [c, r] = g.zone.collision.tileOf(this.pos.x, this.pos.z);
+          if (g.zone.isIceTile(c, r)) this.iceEntryDir = [dx, dz];
+        }
       }
       if (sprinting) { this.useStamina(SPRINT_COST * dt, 0.3); }
     } else if (this.state === 'attack') {
@@ -141,7 +222,7 @@ export class Player {
       if (this.stateT >= dur) { this.state = 'normal'; this.stateT = 0; }
     } else if (this.state === 'dodge') {
       const k = 1 - this.stateT / 0.42;
-      const s = 15 * Math.max(0.2, k);
+      const s = 15 * Math.max(0.2, k) * (this.chillT > 0 ? 0.75 : 1);
       this.moveBy(Math.sin(this.rollDir) * s * dt, Math.cos(this.rollDir) * s * dt);
       this.facing = this.rollDir;
       if (this.stateT > 0.42) { this.state = 'normal'; this.stateT = 0; }
@@ -190,6 +271,8 @@ export class Player {
 
   startDodge(dir) {
     if (this.stamina < DODGE_COST * 0.6 || this.exhausted) { this.game.audio.sfx('stamina'); return; }
+    const z = this.game.zone;
+    if (z.isIce && z.isIceTile(...z.collision.tileOf(this.pos.x, this.pos.z))) return; // en el hielo no hay agarre
     this.state = 'dodge'; this.stateT = 0; this.rollDir = dir;
     this.useStamina(DODGE_COST, 0.6);
     this.invuln = Math.max(this.invuln, 0.36);
