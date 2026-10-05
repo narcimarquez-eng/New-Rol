@@ -158,6 +158,7 @@ export class UI {
     $('dialog-text').textContent = d.lines[d.i];
     const last = d.i === d.lines.length - 1;
     if (last && d.opts.choices) {
+      this.freeMouse();
       $('dialog-next').classList.add('hidden');
       const box = $('dialog-choices');
       box.innerHTML = '';
@@ -210,10 +211,16 @@ export class UI {
     this.game.onDialogClosed();
   }
 
+  /** Suelta el ratón capturado para poder pulsar botones (sin abrir la pausa). */
+  freeMouse() {
+    if (this.game.input.releaseLock()) this.game.ignoreUnlock = true;
+  }
+
   // ---------------- tienda ----------------
   openShop(npc) {
     this.shopNpc = npc;
     this.renderShop();
+    this.freeMouse();
     this.show('shop', true);
     this.game.setMode('shop');
   }
