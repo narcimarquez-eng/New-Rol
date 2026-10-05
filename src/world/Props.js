@@ -106,18 +106,14 @@ export function treeGeo(pal) {
 }
 
 export function pineGeo(pal) {
-  const parts = [
+  // con nieve, la parte superior de cada piso queda blanca
+  const snow = pal.pineSnow ? { color: pal.pineSnow, from: 0.32 } : null;
+  return smerge([
     spart(new THREE.CylinderGeometry(0.2, 0.36, 1.8, 8), pal.trunk, { y: 0.9, ao: 0.35 }),
-    spart(new THREE.ConeGeometry(1.85, 2.3, 9), pal.pine, { y: 2.3, ao: 0.5 }),
-    spart(new THREE.ConeGeometry(1.45, 2.0, 9), pal.pine2, { y: 3.5, ry: 0.3, ao: 0.4 }),
-    spart(new THREE.ConeGeometry(0.95, 1.7, 9), pal.pine, { y: 4.6, ry: 0.6, ao: 0.3 }),
-  ];
-  if (pal.pineSnow) {
-    parts.push(spart(new THREE.ConeGeometry(1.0, 0.75, 9), pal.pineSnow, { y: 2.95, ao: 0 }));
-    parts.push(spart(new THREE.ConeGeometry(0.75, 0.65, 9), pal.pineSnow, { y: 4.05, ry: 0.3, ao: 0 }));
-    parts.push(spart(new THREE.ConeGeometry(0.5, 0.75, 9), pal.pineSnow, { y: 5.15, ry: 0.6, ao: 0 }));
-  }
-  return smerge(parts);
+    spart(new THREE.ConeGeometry(1.85, 2.3, 9, 3), pal.pine, { y: 2.3, ao: 0.5, top: snow }),
+    spart(new THREE.ConeGeometry(1.45, 2.0, 9, 3), pal.pine2, { y: 3.5, ry: 0.3, ao: 0.4, top: snow }),
+    spart(new THREE.ConeGeometry(0.95, 1.7, 9, 3), pal.pine, { y: 4.6, ry: 0.6, ao: 0.3, top: snow }),
+  ]);
 }
 
 export function rockGeo(pal) {
@@ -266,12 +262,12 @@ export function buildTorch(pal, { tall = 2.2 } = {}) {
   g.add(pole);
   const flame = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.28, 0),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.5, 0.35), toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 0.7, 0.12), toneMapped: false }),
   );
   flame.position.y = tall + 0.4;
   flame.scale.set(1, 1.6, 1);
   g.add(flame);
-  const inner = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3.4, 1.8), toneMapped: false }));
+  const inner = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.0, 0.9), toneMapped: false }));
   inner.position.y = tall + 0.35;
   g.add(inner);
   g.userData.flame = flame;

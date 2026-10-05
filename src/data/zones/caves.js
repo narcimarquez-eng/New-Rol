@@ -33,6 +33,8 @@ export default {
     cloudTint: 0.95, grassDensity: 0,
   },
   grade: { saturation: 1.02, contrast: 1.07, warmth: -0.025, vignette: 0.38, tint: 0xf2f8ff },
+  bloom: { strength: 0.28, threshold: 0.97 },
+  torchIntensity: 4.5,
   fog: { near: 30, far: 115 },
   music: { root: 62, scale: [0, 2, 3, 5, 7, 8, 10], tempo: 70, prog: [0, 5, 2, 6, 0, 3, 4, 4], lead: 'sine', pad: 'triangle' },
   map: [

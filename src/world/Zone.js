@@ -294,7 +294,7 @@ export class Zone {
       P.part(new THREE.DodecahedronGeometry(0.2, 0), 0x777777, { z: 0.6 }), P.part(new THREE.DodecahedronGeometry(0.2, 0), 0x777777, { z: -0.6 }),
     ]), P.toonMat());
     g.add(logs);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.0, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.2, 0.3), toneMapped: false }));
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.0, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 0.6, 0.1), toneMapped: false }));
     flame.position.y = 0.7;
     g.add(flame);
     g.userData.flameY = 0.8;

@@ -390,10 +390,14 @@ export class Portal extends Base {
     this.root.add(this.mesh);
     this.radius = 2.2;
     this.width = (data.span || 1) * TILE;
+    // la cámara no puede atravesar el arco
+    game.zone.collision.addBox(this.x, this.z, 5.6, 1.2, { tall: true, height: 5.6, cameraOnly: true, tag: 'portal' });
   }
   update() {
     const g = this.game, p = g.player;
-    this.mesh.userData.glow.material.opacity = 0.18 + Math.sin(g.time * 3) * 0.08;
+    // el velo del portal se desvanece si la cámara se acerca (no tapa la vista)
+    const cd = Math.hypot(g.camera.position.x - this.x, g.camera.position.z - this.z);
+    this.mesh.userData.glow.material.opacity = (0.18 + Math.sin(g.time * 3) * 0.08) * THREE.MathUtils.smoothstep(cd, 3, 9);
     if (Math.abs(p.x - this.x) < this.width / 2 && Math.abs(p.z - this.z) < 2.2 && g.mode === 'play' && !g.transitioning) {
       g.usePortal(this.data);
     }

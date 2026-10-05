@@ -11,7 +11,9 @@ export class Collision {
     this.solid = new Array(this.W * this.H);
     for (let r = 0; r < this.H; r++) for (let c = 0; c < this.W; c++) {
       const t = tileInfo(zone.charAt(c, r));
-      this.solid[r * this.W + c] = t.solid ? { kind: t.solid, radius: t.radius || 0, tall: !!t.tall, height: t.height || 5 } : null;
+      // los muros de roca (estilo 'rock') son más altos que los setos
+      const h = t.prop === 'wall' && zone.data.wallStyle === 'rock' ? 8.5 : t.height || 5;
+      this.solid[r * this.W + c] = t.solid ? { kind: t.solid, radius: t.radius || 0, tall: !!t.tall, height: h } : null;
     }
     this.colliders = new Set(); // {type:'box'|'circle', ..., tall, enabled}
   }
@@ -25,8 +27,9 @@ export class Collision {
   }
   clearTile(c, r) { if (c >= 0 && r >= 0 && c < this.W && r < this.H) this.solid[r * this.W + c] = null; }
 
-  addBox(cx, cz, w, d, { tall = true, tag, height = 6 } = {}) {
-    const b = { type: 'box', minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, tall, enabled: true, tag, height };
+  /** cameraOnly: bloquea la cámara pero no a los personajes (p. ej. arcos de portal). */
+  addBox(cx, cz, w, d, { tall = true, tag, height = 6, cameraOnly = false } = {}) {
+    const b = { type: 'box', minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, tall, enabled: true, tag, height, cameraOnly };
     this.colliders.add(b); return b;
   }
   addCircle(x, z, r, { tall = false, tag, height = 3 } = {}) {
@@ -52,7 +55,7 @@ export class Collision {
         }
       }
       for (const col of this.colliders) {
-        if (!col.enabled || col === ignore) continue;
+        if (!col.enabled || col === ignore || col.cameraOnly) continue;
         if (col.type === 'box') { if (pushBox(pos, radius, col.minX, col.maxX, col.minZ, col.maxZ)) moved = true; }
         else if (pushCircle(pos, radius, col.x, col.z, col.r)) moved = true;
       }

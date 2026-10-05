@@ -39,7 +39,7 @@ export function charMat(opts = {}) {
  * Pieza de geometría suave: conserva el índice (normales suavizadas), aplica la
  * transformación y pinta un color uniforme con oscurecimiento inferior opcional (AO).
  */
-export function spart(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, ao = 0.18, flat = false } = {}) {
+export function spart(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, ao = 0.18, flat = false, top = null } = {}) {
   let g = geo;
   for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k);
   if (flat) g = g.index ? g.toNonIndexed() : g;
@@ -53,12 +53,15 @@ export function spart(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0,
   g.computeBoundingBox();
   const bb = g.boundingBox;
   const c = new THREE.Color(color);
+  const tc = top ? new THREE.Color(top.color) : null; // color superior (p. ej. nieve)
   const pos = g.attributes.position;
   const arr = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
     const t = bb.max.y - bb.min.y > 1e-4 ? (pos.getY(i) - bb.min.y) / (bb.max.y - bb.min.y) : 1;
     const k = 1 - ao * (1 - t);
-    arr[i * 3] = c.r * k; arr[i * 3 + 1] = c.g * k; arr[i * 3 + 2] = c.b * k;
+    const cc = tc && t >= top.from ? tc : c;
+    const kk = tc && t >= top.from ? 1 : k;
+    arr[i * 3] = cc.r * kk; arr[i * 3 + 1] = cc.g * kk; arr[i * 3 + 2] = cc.b * kk;
   }
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   return g;

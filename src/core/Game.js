@@ -137,6 +137,10 @@ export class Game {
     this.scene.fog = new THREE.Fog(pal.fog, zone.data.fog.near, zone.data.fog.far);
     this.scene.background = new THREE.Color(pal.fog);
     this.gfx.setGrade(zone.data.grade || {});
+    const bl = zone.data.bloom || {};
+    this.gfx.bloom.strength = bl.strength ?? 0.38;
+    this.gfx.bloom.threshold = bl.threshold ?? 0.9;
+    this.torchPower = zone.data.torchIntensity ?? 9;
   }
 
   updateLights() {
@@ -157,7 +161,7 @@ export class Game {
         : 0.8 + Math.sin(this.time * 11 + t.phase) * 0.1 + Math.sin(this.time * 23 + t.phase * 2) * 0.07 + Math.random() * 0.05;
       l.position.set(t.x, t.y + 0.3, t.z);
       l.color.set(t.color ?? 0xffa040);
-      l.intensity = (t.crystal ? 7 : 9) * flick;
+      l.intensity = (t.crystal ? 7 : this.torchPower ?? 9) * flick;
       if (t.obj.userData.flame) {
         const f = t.obj.userData.flame;
         f.scale.set(0.9 + flick * 0.2, 1.4 + flick * 0.5, 0.9 + flick * 0.2);
