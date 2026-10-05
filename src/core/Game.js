@@ -9,7 +9,7 @@ import { Save } from './Save.js';
 import { Zone } from '../world/Zone.js';
 import { Player } from '../entities/Player.js';
 import { Enemy } from '../entities/Enemy.js';
-import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal } from '../entities/Interactables.js';
+import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetStone } from '../entities/Interactables.js';
 import { Particles } from '../systems/Particles.js';
 import { Projectiles } from '../systems/Projectiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
@@ -90,10 +90,22 @@ export class Game {
     // fondo de la pantalla de título: la aldea
     this.loadZone(START_ZONE, 'start', { silent: true });
     this.cam.yaw = 2.4; this.cam.pitch = 0.32; this.cam.wantDistance = this.cam.distance = 16;
-    document.getElementById('loading').classList.add('hidden');
 
     window.__game = this; // ganchos para tests automatizados y depuración
-    this.loop();
+    // compilar los sombreadores sin bloquear la página antes del primer fotograma
+    this.warmup().finally(() => {
+      document.getElementById('loading').classList.add('hidden');
+      this.loop();
+    });
+  }
+
+  /** Compila de forma asíncrona los programas de la escena actual. */
+  warmup() {
+    const r = this.gfx.renderer;
+    if (!r.compileAsync) return Promise.resolve();
+    // con límite de tiempo: si el navegador no informa del progreso, seguimos igualmente
+    const timeout = new Promise((res) => setTimeout(res, 3000));
+    return Promise.race([r.compileAsync(this.scene, this.camera).catch(() => {}), timeout]);
   }
 
   // ------------------------------------------------------------------ luces
@@ -255,6 +267,9 @@ export class Game {
         case 'sign': this.addInteractable(new Sign(this, e)); break;
         case 'portal': this.addInteractable(new Portal(this, e)); break;
         case 'dummy': { const d = new Dummy(this, e); this.dummies.push(d); this.addInteractable(d); break; }
+        case 'iceblock': this.addInteractable(new IceBlock(this, e)); break;
+        case 'plate': this.addInteractable(new Plate(this, e)); break;
+        case 'resetstone': this.addInteractable(new ResetStone(this, e)); break;
         case 'pickup':
           if (!this.progress.flags.has(`picked_${e.id}`)) this.addInteractable(new Pickup(this, e));
           break;
@@ -266,6 +281,12 @@ export class Game {
       }
     }
 
+    // puzles ya resueltos: el bloque se queda sobre su placa
+    for (const pl of this.interactables.filter((i) => i instanceof Plate && i.pressed)) {
+      const b = this.interactables.find((i) => i instanceof IceBlock && i.id === pl.data.block);
+      if (b) { b.setTile(...pl.tileRC); b.locked = true; }
+    }
+
     const spawn = data.entities.find((e) => e.type === 'spawn' && e.id === spawnId) || data.entities.find((e) => e.type === 'spawn');
     const [sx, sz] = zone.tileToWorld(...spawn.tile);
     this.player.place(sx, sz, spawn.facing || 0);
@@ -274,7 +295,7 @@ export class Game {
     if (!silent) {
       this.audio.playMusic(data.music);
       this.ui.zoneTitle(data.name, data.subtitle);
-      if (id === 'forest') this.progress.flags.add('entered_forest');
+      if (data.enterFlag) this.progress.flags.add(data.enterFlag);
       this.save();
     }
   }
@@ -298,12 +319,12 @@ export class Game {
 
   usePortal(data) {
     if (!ZONES[data.to]) {
-      // zona aún no construida: fin de la Fase 1
-      if (!this.progress.flags.has('phase1_complete')) {
-        this.progress.flags.add('phase1_complete');
+      // zona aún no construida: fin de la fase actual
+      if (data.flag && !this.progress.flags.has(data.flag)) {
+        this.progress.flags.add(data.flag);
         this.save();
       }
-      this.showEnding();
+      this.showEnding(data.ending);
       // devolver al jugador un paso atrás para que no se repita
       this.player.pos.z += 4;
       return;
@@ -314,13 +335,19 @@ export class Game {
     this.audio.sfx('door');
     setTimeout(() => {
       this.loadZone(data.to, data.spawn);
-      fade.classList.remove('on');
-      this.transitioning = false;
+      this.warmup().finally(() => {
+        fade.classList.remove('on');
+        this.transitioning = false;
+      });
     }, 380);
   }
 
-  showEnding() {
+  showEnding(ending = {}) {
     const pr = this.progress;
+    const el = document.getElementById('ending');
+    if (ending.title) el.querySelector('h1').textContent = ending.title;
+    if (ending.tagline) el.querySelector('.tagline').textContent = ending.tagline;
+    if (ending.text) el.querySelector('.tagline + p').innerHTML = ending.text;
     const mins = Math.round(pr.playTime / 60);
     const done = Object.keys(QUESTS).filter((q) => pr.questState(q) === 'done').length;
     const chests = [...pr.flags].filter((f) => f.startsWith('chest_')).length;
@@ -536,6 +563,7 @@ export class Game {
     this.lastFrame = now;
     if (this.params.has('fixeddt')) dt = 1 / 60;
     this.step(dt);
+    if (!this.firstFrameAt) this.firstFrameAt = performance.now();
   }
 
   step(dt) {
@@ -657,6 +685,14 @@ export class Game {
   }
 
   updateAmbient(dt) {
+    if (this.zone.data.ambient === 'snow') {
+      const p = this.player;
+      for (let i = 0; i < 2; i++) {
+        if (Math.random() > dt * 60) continue;
+        const a = Math.random() * Math.PI * 2, d = Math.random() * 22;
+        this.particles.spawn(p.x + Math.cos(a) * d, p.pos.y + 7 + Math.random() * 4, p.z + Math.sin(a) * d, { color: 0xffffff, size: 0.45 + Math.random() * 0.3, life: 4, gravity: 0.6, vx: 0.6 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.5, drag: 0.3 });
+      }
+    }
     if (this.zone.data.ambient === 'fireflies' && Math.random() < dt * 12) {
       const p = this.player;
       const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 18;

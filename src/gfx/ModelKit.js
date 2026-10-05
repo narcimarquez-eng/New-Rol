@@ -88,20 +88,21 @@ export function rockify(geo, amp = 0.15, seed = 1, freq = 2.3) {
 }
 
 // ---------------------------------------------------------------- viento (GLSL compartido)
-function windGLSL(from, amount) {
-  return `
+// Los parámetros van en uniformes para que todos los materiales compartan
+// un único programa de sombreado (menos compilaciones = arranque más rápido).
+const WIND_GLSL = `
       {
-        float hgt = max(0.0, position.y - ${from.toFixed(2)});
+        float hgt = max(0.0, position.y - uWindFrom);
         vec3 ip = vec3(0.0);
         #ifdef USE_INSTANCING
           ip = instanceMatrix[3].xyz;
         #endif
         float ph = ip.x * 0.21 + ip.z * 0.17;
         float sway = sin(uTime * 1.6 + ph) * 0.7 + sin(uTime * 2.9 + ph * 1.7) * 0.3;
-        transformed.x += sway * hgt * ${amount.toFixed(3)} * uWind;
-        transformed.z += cos(uTime * 1.3 + ph) * hgt * ${(amount * 0.6).toFixed(3)} * uWind;
+        transformed.x += sway * hgt * uWindAmount * uWind;
+        transformed.z += cos(uTime * 1.3 + ph) * hgt * uWindAmount * 0.6 * uWind;
       }`;
-}
+const WIND_PARS = 'uniform float uTime;\nuniform float uWind;\nuniform float uWindFrom;\nuniform float uWindAmount;\n';
 
 // ---------------------------------------------------------------- contornos
 const outlineMats = new Map();
@@ -114,12 +115,14 @@ export function outlineMaterial(thickness = 0.03, color = 0x1d1712, { wind = nul
     sh.uniforms.outlineThickness = { value: thickness };
     sh.uniforms.uTime = GLOBAL.time;
     sh.uniforms.uWind = GLOBAL.windStrength;
-    sh.vertexShader = 'uniform float outlineThickness;\nuniform float uTime;\nuniform float uWind;\n' + sh.vertexShader.replace(
+    sh.uniforms.uWindFrom = { value: wind ? wind.from : 0 };
+    sh.uniforms.uWindAmount = { value: wind ? wind.amount : 0 };
+    sh.vertexShader = 'uniform float outlineThickness;\n' + WIND_PARS + sh.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\ntransformed += normalize(normal) * outlineThickness;' + (wind ? windGLSL(wind.from, wind.amount) : ''),
+      '#include <begin_vertex>\ntransformed += normalize(normal) * outlineThickness;' + WIND_GLSL,
     );
   };
-  m.customProgramCacheKey = () => key;
+  m.customProgramCacheKey = () => 'outline-v3';
   outlineMats.set(key, m);
   return m;
 }
@@ -169,12 +172,11 @@ export function windMat(base, { from = 1.2, amount = 0.06 } = {}) {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = GLOBAL.time;
     sh.uniforms.uWind = GLOBAL.windStrength;
-    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\n' + sh.vertexShader.replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>' + windGLSL(from, amount),
-    );
+    sh.uniforms.uWindFrom = { value: from };
+    sh.uniforms.uWindAmount = { value: amount };
+    sh.vertexShader = WIND_PARS + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + WIND_GLSL);
   };
-  m.customProgramCacheKey = () => `wind-${from}-${amount}`;
+  m.customProgramCacheKey = () => 'wind-v3';
   windCache.set(key, m);
   return m;
 }

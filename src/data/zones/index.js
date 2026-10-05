@@ -2,6 +2,7 @@
 // de datos e importarlo aquí: el motor no necesita cambios.
 import village from './village.js';
 import forest from './forest.js';
+import caves from './caves.js';
 
-export const ZONES = { village, forest };
+export const ZONES = { village, forest, caves };
 export const START_ZONE = 'village';

@@ -106,7 +106,7 @@ export default {
       talk: [{ lines: ['Miau. (El gato te mira con desdén y sigue mirando el agua.)'] }] },
     { type: 'npc', id: 'granjero', name: 'Granjero Tomás', tile: [25, 14], look: NPC_LOOKS.farmer, facing: -Math.PI / 2, quests: ['q_slimes'],
       talk: [{ lines: ['Las calabazas de este año van a ser enormes... si los limos me dejan.'] }] },
-    { type: 'npc', id: 'herrero', name: 'Herrero Gonzalo', tile: [10, 14.3], look: NPC_LOOKS.smith, facing: 0, quests: ['q_package'],
+    { type: 'npc', id: 'herrero', name: 'Herrero Gonzalo', tile: [10, 14.3], look: NPC_LOOKS.smith, facing: 0, quests: ['q_package', 'q_mineral'],
       talk: [{ lines: ['El martillo no descansa. ¡Clang, clang!', 'Si alguna vez ves un bloque de mineral raro en las cuevas, tráemelo.'] }] },
     { type: 'npc', id: 'mercader', name: 'Mercader Rosa', tile: [21, 13.3], look: NPC_LOOKS.merchant, facing: 0,
       shop: [

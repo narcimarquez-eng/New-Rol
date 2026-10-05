@@ -306,26 +306,81 @@ export function buildChest({ big = false } = {}) {
 /** Puerta/verja con cerradura. color indica la llave necesaria. */
 export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) {
   const g = new THREE.Group();
+  const icy = style === 'ice' || style === 'icewall';
+  const frameCol = icy ? 0x7f93ad : 0x6d6d6d, frameCol2 = icy ? 0x6f839d : 0x5d5d5d;
   const frame = new THREE.Mesh(merge([
-    part(new THREE.BoxGeometry(0.6, 4.4, 0.8), 0x6d6d6d, { x: -width / 2, y: 2.2 }),
-    part(new THREE.BoxGeometry(0.6, 4.4, 0.8), 0x6d6d6d, { x: width / 2, y: 2.2 }),
-    part(new THREE.BoxGeometry(width + 0.6, 0.6, 0.8), 0x5d5d5d, { y: 4.4 }),
+    part(new THREE.BoxGeometry(0.6, 4.4, 0.8), frameCol, { x: -width / 2, y: 2.2 }),
+    part(new THREE.BoxGeometry(0.6, 4.4, 0.8), frameCol, { x: width / 2, y: 2.2 }),
+    part(new THREE.BoxGeometry(width + 0.6, 0.6, 0.8), frameCol2, { y: 4.4 }),
   ]), toonMat());
   frame.castShadow = true;
   g.add(frame);
-  const doorParts = [];
-  const n = 5;
-  for (let i = 0; i < n; i++) {
-    const x = -width / 2 + 0.3 + (i + 0.5) * ((width - 0.6) / n);
-    doorParts.push(part(new THREE.BoxGeometry((width - 0.6) / n - 0.08, 3.8, 0.25), style === 'wood' ? 0x7a4b2a : 0x555a66, { x, y: 1.95 }));
+  let door;
+  if (style === 'icewall') {
+    // muro macizo de hielo: se derrite con la Llave de Fuego
+    door = new THREE.Mesh(smerge([
+      spart(rockify(new THREE.BoxGeometry(width - 0.5, 4.1, 1.1, 4, 4, 2), 0.18, 31), 0xbfefff, { y: 2.05, ao: 0.25, flat: true }),
+      spart(new THREE.OctahedronGeometry(0.45, 0), color, { y: 2.1, z: 0.5, sy: 1.4, ao: 0, flat: true }),
+    ]), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradient(), transparent: true, opacity: 0.88 }));
+  } else {
+    const doorParts = [];
+    const n = 5;
+    const bar = style === 'wood' ? 0x7a4b2a : style === 'ice' ? 0xa8dcf5 : 0x555a66;
+    for (let i = 0; i < n; i++) {
+      const x = -width / 2 + 0.3 + (i + 0.5) * ((width - 0.6) / n);
+      doorParts.push(part(new THREE.BoxGeometry((width - 0.6) / n - 0.08, 3.8, 0.25), bar, { x, y: 1.95 }));
+    }
+    doorParts.push(part(new THREE.BoxGeometry(width - 0.5, 0.3, 0.35), icy ? 0x6f839d : 0x3b3b3b, { y: 1.1 }));
+    doorParts.push(part(new THREE.BoxGeometry(width - 0.5, 0.3, 0.35), icy ? 0x6f839d : 0x3b3b3b, { y: 3.0 }));
+    doorParts.push(part(new THREE.BoxGeometry(0.7, 0.8, 0.45), color, { y: 2.05 })); // cerradura
+    door = new THREE.Mesh(merge(doorParts), toonMat());
   }
-  doorParts.push(part(new THREE.BoxGeometry(width - 0.5, 0.3, 0.35), 0x3b3b3b, { y: 1.1 }));
-  doorParts.push(part(new THREE.BoxGeometry(width - 0.5, 0.3, 0.35), 0x3b3b3b, { y: 3.0 }));
-  doorParts.push(part(new THREE.BoxGeometry(0.7, 0.8, 0.45), color, { y: 2.05 })); // cerradura
-  const door = new THREE.Mesh(merge(doorParts), toonMat());
   door.castShadow = true;
   g.add(door);
   g.userData.door = door;
+  return g;
+}
+
+/** Bloque de hielo empujable. */
+export function buildIceBlock() {
+  const m = new THREE.Mesh(smerge([
+    spart(new THREE.BoxGeometry(3.5, 3.0, 3.5, 2, 2, 2), 0xa8e3ff, { y: 1.5, ao: 0.3, flat: true }),
+    spart(new THREE.BoxGeometry(3.6, 0.35, 3.6), 0xf2fbff, { y: 3.05, ao: 0, flat: true }),
+    spart(new THREE.BoxGeometry(0.15, 2.2, 0.1), 0xe8f9ff, { x: -0.9, y: 1.6, z: 1.76, rz: 0.3, ao: 0, flat: true }),
+    spart(new THREE.BoxGeometry(0.12, 1.4, 0.1), 0xe8f9ff, { x: 0.8, y: 1.2, z: 1.76, rz: -0.5, ao: 0, flat: true }),
+  ]), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradient(), emissive: new THREE.Color(0x10303f) }));
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/** Placa de presión rúnica. */
+export function buildPlate() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(smerge([
+    spart(new THREE.CylinderGeometry(1.8, 1.9, 0.2, 16), 0x6f7f95, { y: 0.1, ao: 0 }),
+  ]), toonMat());
+  base.receiveShadow = true;
+  g.add(base);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.2, 16), new THREE.MeshToonMaterial({ color: 0x9fb4cc, gradientMap: getGradient(), emissive: new THREE.Color(0) }));
+  top.position.y = 0.28;
+  g.add(top);
+  const rune = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.08, 6, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.2, 1.8), toneMapped: false }));
+  rune.rotation.x = Math.PI / 2; rune.position.y = 0.39;
+  g.add(rune);
+  g.userData.top = top; g.userData.rune = rune;
+  return g;
+}
+
+/** Piedra rúnica que reinicia los bloques de un puzle. */
+export function buildRuneStone() {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(smerge([
+    spart(rockify(new THREE.BoxGeometry(1.2, 2.4, 0.8, 2, 3, 1), 0.12, 41), 0x7f8ea6, { y: 1.2, ao: 0.35, flat: true }),
+  ]), toonMat()));
+  const glyph = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.06, 6, 3), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.7, 1.6, 2.2), toneMapped: false }));
+  glyph.position.set(0, 1.5, 0.45);
+  g.add(glyph);
+  g.children[0].castShadow = true;
   return g;
 }
 

@@ -7,6 +7,52 @@
 //   offer (ofrecer), active (en curso), complete (entregar), done (después),
 //   target (al hablar con el objetivo de 'talk'/'deliver').
 export const QUESTS = {
+  // ---------------------------------------------------------------- Cuevas Heladas
+  q_soup: {
+    name: 'Sopa caliente', zone: 'caves', giver: 'olaf', type: 'deliver', item: 'termo', target: 'sven',
+    desc: 'Lleva el termo de sopa de Olaf a su compañero Sven, refugiado en la cueva del noreste.',
+    reward: [['potion', 2], ['coin', 30]],
+    lines: {
+      offer: ['¡Brrr! Bienvenido a las Cuevas Heladas, forastero.', 'Mi compañero Sven fue a explorar el noreste y no ha vuelto. Seguro que está muerto de frío.', '¿Le llevarías este termo de sopa caliente?'],
+      active: ['Sven estará en el refugio de roca del noreste. Sigue la pared este hacia el norte.'],
+      target: ['¡Sopa! ¡Olaf, eres un santo! Llevo dos días comiendo nieve.', 'Gracias, amigo. Toma esto: a mí ya no me hace falta.', 'Por cierto... en la sala de los bloques hay una pared que suena hueca. ¡Al oeste!'],
+      done: ['Sven ha vuelto sano y salvo. ¡Te debo una!'],
+    },
+  },
+  q_wolves: {
+    name: 'Lobos hambrientos', zone: 'caves', giver: 'olaf', type: 'kill', enemy: 'wolf', count: 5,
+    desc: 'Los lobos de las nieves rondan el campamento de Olaf. Derrota a 5.',
+    reward: [['heart_container', 1]],
+    lines: {
+      offer: ['Una cosa más: los lobos de las nieves no nos dejan dormir.', 'Si acabas con cinco, te daré algo que encontré congelado en el lago.'],
+      active: ['Los lobos cazan en la explanada y en el valle del este. ¡Cuidado con sus embestidas!'],
+      complete: ['¡Por fin podremos dormir tranquilos! Toma, te lo prometí.'],
+      done: ['Sin lobos, el campamento es casi acogedor. Casi.'],
+    },
+  },
+  q_crystals: {
+    name: 'Cristales de escarcha', zone: 'caves', giver: 'greta', type: 'collect', item: 'frost_crystal', count: 5, consume: true,
+    desc: 'Greta, la minera, necesita 5 cristales de escarcha. Brillan en rincones de toda la cueva.',
+    reward: [['stamina_up', 1], ['coin', 60]],
+    lines: {
+      offer: ['¡Ey! Soy Greta, minera de cristales.', 'Los cristales de escarcha sueltos brillan como pequeñas estrellas azules. Necesito cinco para mi lámpara eterna.', '¿Me ayudas a encontrarlos?'],
+      active: ['Busca por el lago, el refugio del noreste, la guarida de los lobos... ¡y donde nadie mira!'],
+      complete: ['¡Cinco cristales perfectos! Mi lámpara brillará cien años.', 'Toma este elixir: los mineros lo usamos para aguantar el frío.'],
+      done: ['¡Mira qué luz! Gracias a ti, ya no necesito antorcha.'],
+    },
+  },
+  q_mineral: {
+    name: 'Mineral de las cuevas', zone: 'village', giver: 'herrero', type: 'collect', item: 'mineral', count: 1, consume: true,
+    desc: 'Gonzalo puede forjar una espada mejor con un mineral raro de las Cuevas Heladas.',
+    reward: [['sword_steel', 1]],
+    requires: { quest: { id: 'q_package', state: 'done' } },
+    lines: {
+      offer: ['Dicen que en las Cuevas Heladas, más allá del bosque, hay un mineral estelar escondido.', 'Si me lo traes, te forjaré la mejor espada que hayas visto.'],
+      active: ['Mineral estelar... brilla con un tono violeta. Seguro que está bien escondido en las cuevas.'],
+      complete: ['¡Por mi yunque! Es mineral estelar de verdad.', '¡Clang, clang, clang! ... Aquí tienes: ¡la Espada de acero!'],
+      done: ['Cuida esa espada. Es lo mejor que he forjado nunca.'],
+    },
+  },
   q_cat: {
     name: 'El gato perdido', zone: 'village', giver: 'lucia', type: 'talk', target: 'misi',
     desc: 'Lucía ha perdido a su gato Misi. Suele esconderse cerca del agua, al este.',

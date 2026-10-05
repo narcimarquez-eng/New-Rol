@@ -156,6 +156,7 @@ export class Player {
     let dx = fx * mv.y + rx * mv.x, dz = fz * mv.y + rz * mv.x;
     const dl = Math.hypot(dx, dz);
     if (dl > 0) { dx /= dl; dz /= dl; }
+    this.inputDir = { x: dx, z: dz, mag };
 
     this.blocking = this.state === 'normal' && input.isDown('block') && !this.exhausted;
     const sprinting = this.state === 'normal' && !this.blocking && input.isDown('run') && mag > 0.1 && this.stamina > 1 && !this.exhausted;

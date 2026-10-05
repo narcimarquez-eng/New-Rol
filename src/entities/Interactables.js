@@ -166,7 +166,7 @@ export class Chest extends Base {
     if (this.opened) this.mesh.userData.lid.rotation.x = -1.9;
     const s = data.big ? 1.4 : 1;
     this.collider = game.zone.collision.addBox(this.x, this.z, 1.5 * s, 1.5 * s, { tall: false, tag: 'chest' });
-    this.radius = data.big ? 3.2 : 2.4;
+    this.radius = data.big ? 4.6 : 4.2; // se puede abrir desde la casilla de al lado
     this.openT = -1;
     this.updateVisibility();
   }
@@ -258,7 +258,14 @@ export class Door extends Base {
       const p = this.game.player;
       if (Math.hypot(p.x - this.x, p.z - this.z) < 9) this.openDoor();
     }
-    if (this.open && this.anim < 1) { this.anim = Math.min(1, this.anim + dt * 0.8); this.applyAnim(); }
+    if (this.open && this.anim < 1) {
+      this.anim = Math.min(1, this.anim + dt * (this.data.style === 'icewall' ? 0.45 : 0.8));
+      this.applyAnim();
+      if (this.data.style === 'icewall' && Math.random() < 0.8) {
+        // vapor al derretirse
+        this.game.particles.spawn(this.x + (Math.random() - 0.5) * 6, this.y + 1 + Math.random() * 3, this.z + (Math.random() - 0.5), { color: 0xffffff, size: 1.8, life: 1.2, gravity: -2, vy: 1, drag: 1 });
+      }
+    }
   }
 }
 
@@ -390,5 +397,172 @@ export class Portal extends Base {
     if (Math.abs(p.x - this.x) < this.width / 2 && Math.abs(p.z - this.z) < 2.2 && g.mode === 'play' && !g.transitioning) {
       g.usePortal(this.data);
     }
+  }
+}
+
+// ---------------- puzles de hielo ----------------
+const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/** Bloque de hielo que se empuja caminando contra él; sobre el hielo se desliza. */
+export class IceBlock extends Base {
+  constructor(game, data) {
+    super(game, data);
+    this.id = data.id;
+    this.kind = 'iceblock';
+    this.group = data.group;
+    this.home = [Math.round(data.tile[0]), Math.round(data.tile[1])];
+    this.tile = [...this.home];
+    this.mesh = P.buildIceBlock();
+    outlineAll(this.mesh, 0.05);
+    this.root.add(this.mesh);
+    this.collider = game.zone.collision.addBox(this.x, this.z, TILE * 0.88, TILE * 0.88, { tall: true, height: 3.2, tag: 'iceblock' });
+    this.pushT = 0;
+    this.moving = null; // { dir, to }
+    this.locked = false; // sobre su placa: ya no se mueve
+    this.mapColor = '#bfefff';
+  }
+
+  setTile(c, r) {
+    this.tile = [c, r];
+    const [x, z] = this.game.zone.tileToWorld(c, r);
+    this.x = x; this.z = z;
+    this.updateCollider();
+  }
+
+  updateCollider() {
+    const h = TILE * 0.44;
+    Object.assign(this.collider, { minX: this.x - h, maxX: this.x + h, minZ: this.z - h, maxZ: this.z + h });
+    this.y = this.game.zone.height(this.x, this.z);
+    this.root.position.set(this.x, this.y, this.z);
+  }
+
+  /** ¿Puede el bloque ocupar la casilla? (sin muros, otros objetos ni el jugador) */
+  canEnter(c, r) {
+    const zone = this.game.zone, col = zone.collision;
+    const s = col.getSolid(c, r);
+    if (s) return false;
+    const [x, z] = col.tileCenter(c, r);
+    for (const o of col.colliders) {
+      if (!o.enabled || o === this.collider) continue;
+      if (o.type === 'box' && x > o.minX - 0.5 && x < o.maxX + 0.5 && z > o.minZ - 0.5 && z < o.maxZ + 0.5) return false;
+      if (o.type === 'circle' && Math.hypot(x - o.x, z - o.z) < o.r + 1.2) return false;
+    }
+    const p = this.game.player;
+    if (Math.abs(p.x - x) < TILE * 0.5 + p.radius && Math.abs(p.z - z) < TILE * 0.5 + p.radius) return false;
+    return true;
+  }
+
+  push(dc, dr) {
+    const [c, r] = this.tile;
+    if (!this.canEnter(c + dc, r + dr)) { this.game.audio.sfx('locked'); return; }
+    this.moving = { dir: [dc, dr], to: [c + dc, r + dr] };
+    this.game.audio.sfx('door');
+  }
+
+  reset() {
+    if (this.locked) return;
+    this.moving = null;
+    this.setTile(...this.home);
+    this.game.particles.puff(this.x, this.y + 1, this.z, { color: 0xcff6ff, count: 14, size: 2.4 });
+  }
+
+  update(dt) {
+    const g = this.game, p = g.player;
+    if (this.moving) {
+      const [tc, tr] = this.moving.to;
+      const [tx, tz] = g.zone.tileToWorld(tc, tr);
+      const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz);
+      const step = 11 * dt;
+      if (d <= step) {
+        this.x = tx; this.z = tz; this.tile = [tc, tr];
+        const [dc, dr] = this.moving.dir;
+        if (g.zone.isIceTile(tc, tr) && this.canEnter(tc + dc, tr + dr)) this.moving.to = [tc + dc, tr + dr];
+        else { this.moving = null; g.shake(0.15); g.particles.puff(this.x, this.y + 0.3, this.z, { color: 0xe8fbff, count: 8, size: 2 }); }
+      } else {
+        this.x += dx / d * step; this.z += dz / d * step;
+        if (Math.random() < 0.5) g.particles.spawn(this.x, this.y + 0.1, this.z, { color: 0xe8fbff, size: 0.8, life: 0.5, vy: 1.5, vx: (Math.random() - 0.5) * 3, vz: (Math.random() - 0.5) * 3 });
+      }
+      this.updateCollider();
+      return;
+    }
+    if (this.locked || p.state !== 'normal' || p.slide) { this.pushT = 0; return; }
+    // empuje: jugador pegado a una cara del bloque y caminando hacia él
+    const id = p.inputDir;
+    let pushing = null;
+    if (id && id.mag > 0.4) {
+      for (const [dc, dr] of CARDINALS) {
+        const along = dc ? (this.x - p.x) * dc : (this.z - p.z) * dr;
+        const across = dc ? Math.abs(this.z - p.z) : Math.abs(this.x - p.x);
+        const dot = id.x * dc + id.z * dr;
+        // desde la casilla contigua (sobre hielo el jugador se queda en el centro de la casilla)
+        if (along > 0 && along < TILE + 0.3 && across < 1.4 && dot > 0.75) pushing = [dc, dr];
+      }
+    }
+    if (pushing && this.pushDir && pushing[0] === this.pushDir[0] && pushing[1] === this.pushDir[1]) {
+      this.pushT += dt;
+      if (this.pushT > 0.35) { this.pushT = 0; this.push(...pushing); }
+    } else { this.pushT = 0; this.pushDir = pushing; }
+  }
+}
+
+/** Placa de presión: se activa con un bloque de hielo encima. */
+export class Plate extends Base {
+  constructor(game, data) {
+    super(game, data);
+    this.id = data.id;
+    this.kind = 'plate';
+    this.tileRC = [Math.round(data.tile[0]), Math.round(data.tile[1])];
+    this.mesh = P.buildPlate();
+    this.root.add(this.mesh);
+    this.pressed = game.progress.flags.has(data.flag);
+    this.mapColor = this.pressed ? null : '#7fdcff';
+    this.applyLook();
+  }
+  applyLook() {
+    const u = this.mesh.userData;
+    u.top.position.y = this.pressed ? 0.12 : 0.28;
+    u.top.material.emissive.set(this.pressed ? 0x2a7fa8 : 0x000000);
+  }
+  update() {
+    if (this.pressed) return;
+    const g = this.game;
+    const block = g.interactables.find((i) => i instanceof IceBlock && !i.moving && i.tile[0] === this.tileRC[0] && i.tile[1] === this.tileRC[1]);
+    if (!block) {
+      this.mesh.userData.rune.material.color.setRGB(0.6, 1.2, 1.8).multiplyScalar(0.7 + Math.sin(g.time * 3) * 0.3);
+      return;
+    }
+    this.pressed = true;
+    block.locked = true;
+    this.mapColor = null;
+    g.progress.flags.add(this.data.flag);
+    g.audio.sfx('secret');
+    g.ui.toast(this.data.text || '¡Algo se ha abierto a lo lejos!');
+    g.particles.sparkle(this.x, this.y + 0.5, this.z, { color: 0x9ff3ff, count: 50, radius: 2 });
+    g.shake(0.3);
+    this.applyLook();
+    g.save();
+  }
+}
+
+/** Piedra rúnica: devuelve los bloques de su grupo a la posición inicial. */
+export class ResetStone extends Base {
+  constructor(game, data) {
+    super(game, data);
+    this.kind = 'resetstone';
+    this.mesh = P.buildRuneStone();
+    outlineAll(this.mesh, 0.04);
+    this.root.add(this.mesh);
+    this.root.rotation.y = data.facing || 0;
+    game.zone.collision.addCircle(this.x, this.z, 0.7);
+    this.radius = 2.6;
+  }
+  get prompt() { return 'Tocar la piedra rúnica (reiniciar bloques)'; }
+  interact() {
+    const g = this.game;
+    const blocks = g.interactables.filter((i) => i instanceof IceBlock && i.group === this.data.group);
+    if (blocks.every((b) => b.locked)) { g.ui.toast('La piedra ya no reacciona.'); return; }
+    blocks.forEach((b) => b.reset());
+    g.audio.sfx('secret');
+    g.ui.toast('Los bloques vuelven a su sitio.');
   }
 }

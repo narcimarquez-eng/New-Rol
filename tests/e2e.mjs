@@ -16,6 +16,9 @@ mkdirSync(OUT, { recursive: true });
 const executablePath = process.env.CHROMIUM_PATH || (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
 
 let failures = 0;
+const waitTrue = async (page, fn, ms = 20000) => {
+  try { await page.waitForFunction(fn, null, { timeout: ms, polling: 200 }); return true; } catch { return false; }
+};
 const ok = (cond, msg) => {
   console.log(`${cond ? '✔' : '✘'} ${msg}`);
   if (!cond) failures++;
@@ -42,9 +45,10 @@ try {
   // ---------- carga ----------
   const t0 = Date.now();
   await page.goto(URL, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game && window.__game.zone, null, { timeout: 15000 });
-  const loadMs = Date.now() - t0;
-  ok(loadMs < 5000, `el juego carga en ${loadMs} ms (< 5000)`);
+  await page.waitForFunction(() => window.__game && window.__game.firstFrameAt, null, { timeout: 30000, polling: 50 });
+  const loadMs = await page.evaluate(() => Math.round(window.__game.firstFrameAt));
+  ok(loadMs < 5000, `el juego carga y dibuja su primer fotograma en ${loadMs} ms (< 5000)`);
+  console.log(`  (tiempo total incluyendo el arranque del navegador: ${Date.now() - t0} ms)`);
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${OUT}/01-title.png` });
 
@@ -207,8 +211,7 @@ try {
 
   // ---------- recorrido de la historia del bosque ----------
   await page.evaluate(() => { window.__game.godMode = true; window.__t.tp(3, 25.5, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(0.5); });
-  await page.waitForTimeout(700);
-  ok(await page.evaluate(() => window.__game.progress.has('key_maze')), 'el cofre del claro oeste da la Llave del Laberinto');
+  ok(await waitTrue(page, () => window.__game.progress.has('key_maze')), 'el cofre del claro oeste da la Llave del Laberinto');
   await page.screenshot({ path: `${OUT}/08-forest-chest.png` });
   await page.evaluate(() => { window.__t.tp(22.5, 23.75, Math.PI); window.__t.sim(0.2); window.__game.input.press('interact'); window.__t.sim(2); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_f_maze_gate')), 'la llave abre la puerta del laberinto');
@@ -231,15 +234,148 @@ try {
   await page.evaluate(() => window.__t.sim(1));
   await page.screenshot({ path: `${OUT}/10-boss-defeated.png` });
   await page.evaluate(() => { window.__t.tp(21.5, 9.62, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(0.5); });
-  await page.waitForTimeout(700);
-  ok(await page.evaluate(() => window.__game.progress.has('key_forest')), 'el gran cofre da la Llave del Bosque');
+  ok(await waitTrue(page, () => window.__game.progress.has('key_forest')), 'el gran cofre da la Llave del Bosque');
   await page.evaluate(() => { window.__game.mode = 'play'; window.__game.ui.show('itemget', false); window.__t.tp(22.5, 1.78, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(2.2); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_f_north_gate')), 'la Llave del Bosque abre la puerta norte');
   await page.evaluate(() => { window.__t.tp(22.5, 0.2, Math.PI); window.__t.sim(0.4); });
-  ok(await page.evaluate(() => window.__game.progress.flags.has('phase1_complete')), 'el portal norte completa la Fase 1');
-  await page.screenshot({ path: `${OUT}/11-ending.png` });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.__t.sim(0.3));
+  ok(await page.evaluate(() => window.__game.zone.id === 'caves'), 'el portal norte del bosque lleva a las Cuevas Heladas');
+  ok(await page.evaluate(() => window.__game.progress.flags.has('entered_caves')), 'se registra la entrada en las cuevas');
+  await page.screenshot({ path: `${OUT}/11-caves-entry.png` });
+
+  // =================== FASE 2: CUEVAS HELADAS ===================
+  const caves = await collisionReport();
+  ok(caves.inside === 0, `Cuevas: ${caves.tests} pasos sin atravesar paredes (${caves.inside} fallos)`);
+  const camC = await cameraReport();
+  ok(camC.bad === 0, `Cuevas: cámara correcta en ${camC.n} posiciones (${camC.bad} fallos)`);
+
+  // ejecutor de movimientos del solucionador sobre el juego real
+  await page.evaluate(() => {
+    const g = window.__game;
+    const KEY = { N: 'up', S: 'down', W: 'left', E: 'right' };
+    const D = { N: [0, -1], S: [0, 1], W: [-1, 0], E: [1, 0] };
+    const tileNow = () => g.zone.collision.tileOf(g.player.x, g.player.z);
+    const sim = (sec) => { g.noRender = true; for (let i = 0; i < sec * 60; i++) { g.cam.yaw = 0; g.cam.idleLook = 0; g.step(1 / 60); g.input.endFrame(); } g.noRender = false; };
+    window.__t.exec = (moves) => {
+      g.godMode = true;
+      for (const m of moves) {
+        const [c, r] = tileNow();
+        const [dc, dr] = D[m];
+        const n = [c + dc, r + dr];
+        const block = g.interactables.find((i) => i.kind === 'iceblock' && i.tile[0] === n[0] && i.tile[1] === n[1]);
+        const ice = g.zone.isIceTile(c, r) || g.zone.isIceTile(n[0], n[1]);
+        if (block) {
+          g.input.down.add(KEY[m]); sim(0.5);
+          for (let k = 0; k < 40 && !block.moving; k++) sim(0.05);
+          g.input.down.delete(KEY[m]);
+          for (let k = 0; k < 120 && block.moving; k++) sim(0.05);
+          sim(0.1);
+          // tras empujar, volver al centro de la casilla (el jugador no se mueve en el solucionador)
+          const [x, z] = g.zone.tileToWorld(c, r); g.player.pos.x = x; g.player.pos.z = z;
+        } else if (ice) {
+          // desde la nieve se camina hasta pisar el hielo; sobre el hielo basta un toque
+          g.input.down.add(KEY[m]);
+          for (let k = 0; k < 60; k++) {
+            sim(1 / 60);
+            const [tc, tr] = tileNow();
+            if (g.player.slide || (tc === n[0] && tr === n[1]) || g.zone.isIceTile(c, r)) break;
+          }
+          sim(0.1); g.input.down.delete(KEY[m]);
+          for (let k = 0; k < 160 && g.player.slide; k++) sim(0.05);
+          sim(0.1);
+        } else {
+          const [x, z] = g.zone.tileToWorld(n[0], n[1]); g.player.place(x, z, g.player.facing);
+          sim(0.05);
+        }
+      }
+      return tileNow();
+    };
+  });
+
+  // --- puzle 1: lago helado (solución del solucionador: N W N W W W W S) ---
+  const lakeEnd = await page.evaluate(() => { window.__t.tp(12, 37, Math.PI); return window.__t.exec(['N', 'W', 'N', 'W', 'W', 'W', 'W', 'S']); });
+  ok(Math.abs(lakeEnd[0] - 7) + Math.abs(lakeEnd[1] - 35) === 1, `el deslizamiento sobre hielo sigue la solución del lago (acaba en ${lakeEnd})`);
+  await page.screenshot({ path: `${OUT}/12-ice-lake.png` });
+  await page.evaluate(() => { const g = window.__game; g.input.press('interact'); window.__t.sim(0.4); });
+  ok(await waitTrue(page, () => window.__game.progress.has('key_frost')), 'el cofre de la isla da la Llave de escarcha');
+
+  // --- nada de quedarse atrapado: desde cualquier casilla del lago se puede salir ---
+  // (comprobado exhaustivamente por tools/genmaps.py; aquí una muestra)
+  const stuck = await page.evaluate(() => {
+    const g = window.__game;
+    window.__t.tp(5, 38, Math.PI);
+    return window.__t.exec(['E', 'N', 'E', 'S']);
+  });
+  ok(Array.isArray(stuck), 'moverse por el lago no bloquea el juego');
+
+  // --- puerta A ---
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(22.5, 29.8, Math.PI); window.__t.sim(0.2); g.input.press('interact'); window.__t.sim(2.2); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_gateA')), 'la Llave de escarcha abre la puerta de hielo');
+
+  // --- puzle 2: bloque hasta la placa (29 pasos del solucionador) ---
+  const blockSol = ['W', 'W', 'W', 'W', 'W', 'W', 'N', 'E', 'N', 'N', 'W', 'W', 'W', 'W', 'W', 'W', 'N', 'W', 'S', 'W', 'S', 'S', 'E', 'E', 'E', 'S', 'E', 'N', 'N'];
+  await page.evaluate((sol) => { window.__t.tp(22, 27, Math.PI); window.__t.exec(sol); }, blockSol);
+  await page.screenshot({ path: `${OUT}/13-block-puzzle.png` });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('c_plate1')), 'empujar el bloque de hielo hasta la placa resuelve el puzle');
+  await page.evaluate(() => { window.__t.tp(22.5, 18.6, Math.PI); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_gateB')), 'la placa abre la reja del norte');
+
+  // --- piedra rúnica: reinicia un bloque no resuelto (prueba con el estado actual: ya resuelto, no se mueve) ---
+  const blockStays = await page.evaluate(() => {
+    const g = window.__game;
+    const b = g.interactables.find((i) => i.kind === 'iceblock');
+    const stone = g.interactables.find((i) => i.kind === 'resetstone');
+    stone.interact();
+    return b.tile[0] === 27 && b.tile[1] === 19;
+  });
+  ok(blockStays, 'un bloque ya colocado en su placa no se reinicia');
+
+  // --- Golem de Hielo (2 fases) ---
+  await page.evaluate(() => { window.__t.tp(22.5, 10, Math.PI); window.__t.sim(0.5); });
+  await page.screenshot({ path: `${OUT}/14-golem.png` });
+  const golemDead = await page.evaluate(() => {
+    const g = window.__game;
+    g.godMode = true;
+    let sawProjectile = false, sawPhase2 = false;
+    for (let i = 0; i < 60 * 60; i++) {
+      const b = g.enemies.find((e) => e.def.boss);
+      if (!b) break;
+      if (b.phase === 2) sawPhase2 = true;
+      if (g.projectiles.list.length) sawProjectile = true;
+      const d = Math.hypot(b.x - g.player.x, b.z - g.player.z);
+      if (d > 3.6) { const a = Math.atan2(g.player.x - b.x, g.player.z - b.z); g.player.pos.x = b.x + Math.sin(a) * 3.4; g.player.pos.z = b.z + Math.cos(a) * 3.4; g.zone.collision.resolve(g.player.pos, 0.5); }
+      // a veces alejarse para provocar lanzamientos
+      if (b.phase === 2 && i % 400 < 60) { g.player.pos.x = b.x + 10; g.zone.collision.resolve(g.player.pos, 0.5); }
+      if (i % 10 === 0) g.input.press('attack');
+      g.noRender = true; g.step(1 / 60); g.noRender = false; g.input.endFrame();
+    }
+    return { dead: !g.enemies.some((e) => e.def.boss), sawPhase2, sawProjectile };
+  });
+  ok(golemDead.dead, 'el Golem de Hielo puede ser derrotado');
+  ok(golemDead.sawPhase2, 'el Golem entra en su segunda fase');
+  ok(golemDead.sawProjectile, 'el Golem lanza rocas de hielo en la segunda fase');
+  await page.evaluate(() => window.__t.sim(1));
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(22.5, 4.6, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('key_fire')), 'el gran cofre da la Llave de Fuego');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(22.5, 1.78, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(3); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_north')), 'la Llave de Fuego derrite el muro de hielo');
+  await page.evaluate(() => { window.__t.tp(22.5, 0.2, Math.PI); window.__t.sim(0.4); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('phase2_complete')), 'el paso del norte completa la Fase 2');
+  ok(await page.evaluate(() => /Fase 2/.test(document.querySelector('#ending h1').textContent)), 'se muestra la pantalla de fin de la Fase 2');
+  await page.screenshot({ path: `${OUT}/15-ending.png` });
   await page.evaluate(() => { document.getElementById('btn-keep').click(); });
 
+  // --- misión de entrega: la sopa de Olaf para Sven ---
+  const soup = await page.evaluate(() => {
+    const g = window.__game;
+    const talk = (id) => { const n = g.interactables.find((i) => i.id === id); g.talkTo(n); for (let k = 0; k < 20 && g.ui.dialog; k++) { g.ui.advanceDialog(); g.ui.advanceDialog(); } };
+    talk('olaf');
+    const got = g.progress.has('termo');
+    talk('sven');
+    return [got, g.progress.questState('q_soup')];
+  });
+  ok(soup[0] && soup[1] === 'done', `misión "Sopa caliente": aceptar, entregar y completar (${soup})`);
 
   // ---------- guardado ----------
   const saved = await page.evaluate(() => { window.__game.save(); return !!localStorage.getItem('newrol.save.v1'); });

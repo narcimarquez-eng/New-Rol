@@ -10,6 +10,30 @@ import { rng, hash2 } from '../core/utils.js';
 import { buildGrass } from './Grass.js';
 import { windMat, instancedOutline, addOutline } from '../gfx/ModelKit.js';
 
+let iceMat = null;
+/** Material del hielo: brillo especular, transparencia leve y grietas pintadas. */
+function iceMaterial() {
+  if (iceMat) return iceMat;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, 128, 128);
+  c.strokeStyle = 'rgba(120,170,200,0.55)'; c.lineWidth = 1.5;
+  const r = rng(9);
+  for (let i = 0; i < 9; i++) {
+    let x = r() * 128, y = r() * 128;
+    c.beginPath(); c.moveTo(x, y);
+    for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 50; y += (r() - 0.5) * 50; c.lineTo(x, y); }
+    c.stroke();
+  }
+  c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(20, 30); c.lineTo(40, 18); c.stroke();
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  iceMat = new THREE.MeshStandardMaterial({ color: 0xd2f1ff, map: tex, roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.72, emissive: new THREE.Color(0x1a3a4a) });
+  return iceMat;
+}
+
 export class Zone {
   /**
    * @param {object} data datos de la zona
@@ -87,7 +111,7 @@ export class Zone {
   /** Recorre el mapa y genera las mallas instanciadas por tipo de objeto. */
   buildTiles() {
     const pal = this.palette;
-    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [] };
+    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [] };
     const rockWalls = this.data.wallStyle === 'rock';
     const r = rng(this.data.terrain?.seed ?? 1);
     this.bushIndex = new Map(); // "c,r" -> índice de instancia
@@ -131,9 +155,11 @@ export class Zone {
           }
           case 'bridge': lists.bridge.push({ x, y: -0.35, z, ry: 0 }); break;
           case 'crystal': lists.crystal.push({ x: x + jx * 0.5, y, z: z + jz * 0.5, ry: rot, s: sc }); this.torches.push({ x, z, y: y + 1.4, phase: rot, color: this.palette.crystalLight ?? 0x7fd8ff, crystal: true, obj: { userData: {} } }); break;
+          case 'iceSheet': break;
           case 'icepillar': lists.icepillar.push({ x, y: y - 0.1, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, sy: 0.9 + hash2(c, row, 6) * 0.3 }); break;
           default: break;
         }
+        if (info.ice) lists.iceSheet.push({ x, y: this.height(x, z) + 0.04, z, ry: Math.floor(hash2(c, row, 9) * 4) * Math.PI / 2 });
         if (occ) continue;
         if (info.decor === 'flowers') {
           for (let k = 0; k < 6; k++) lists.flowers.push({ x: x + (r() - 0.5) * 3.6, y, z: z + (r() - 0.5) * 3.6, s: 0.8 + r() * 0.6, color: flowerColors[Math.floor(r() * flowerColors.length)] });
@@ -180,6 +206,11 @@ export class Zone {
     add(P.bridgeGeo(pal), tm, lists.bridge, { outline: 0.03 });
     add(P.crystalGeo(pal), P.toonMat({ emissive: new THREE.Color(pal.crystalGlow ?? 0x2a6f8f) }), lists.crystal, { outline: 0.03 });
     add(P.icePillarGeo(pal), tm, lists.icepillar, { outline: 0.05 });
+    // placas de hielo brillantes con grietas
+    if (lists.iceSheet.length) {
+      const sheet = P.instanced(new THREE.PlaneGeometry(TILE, TILE).rotateX(-Math.PI / 2), iceMaterial(), lists.iceSheet, { castShadow: false });
+      this.group.add(sheet);
+    }
     // hierba con viento
     if (pal.grassDensity !== 0) this.group.add(buildGrass(this, Math.round((pal.grassDensity ?? 48) * (high ? 1 : 0.4))));
   }

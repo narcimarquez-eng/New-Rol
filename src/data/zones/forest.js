@@ -14,6 +14,7 @@ export default {
   name: 'Bosque Encantado',
   subtitle: 'Donde la luz se pierde entre los árboles',
   difficulty: 1.45,
+  enterFlag: 'entered_forest',
   terrain: { amplitude: 1.2, seed: 9 },
   wallStyle: 'forest',
   palette: {
@@ -82,7 +83,7 @@ export default {
     { type: 'spawn', id: 'fromVillage', tile: [22.5, 43], facing: Math.PI },
     { type: 'spawn', id: 'fromCaves', tile: [22.5, 3], facing: 0 },
     { type: 'portal', tile: [22, 45], span: 2, to: 'village', spawn: 'fromForest', label: 'Aldea Inicial' },
-    { type: 'portal', tile: [22, 0], span: 2, to: 'caves', spawn: 'fromForest', label: 'Cuevas Heladas', flag: 'phase1_complete' },
+    { type: 'portal', tile: [22, 0], span: 2, to: 'caves', spawn: 'fromForest', label: 'Cuevas Heladas' },
 
     // --- puertas ---
     { type: 'door', id: 'f_maze_gate', tile: [22, 23], span: 2, requires: { item: 'key_maze' }, consume: true, style: 'stone',
