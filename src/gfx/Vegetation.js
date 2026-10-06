@@ -28,7 +28,7 @@ export const KINDS = {
   hedgeCard: { card: 'hedge', height: 3.2, leaf: 'oak', tint: 0xb8d498, core: 0x2c4620 },
   pineCard: { card: 'pine', height: 9.5, bark: 'pine', leaf: 'pine', tint: 0xb8cca0, core: 0x1f3219 },
   snowPineCard: { card: 'pine', height: 9, bark: 'pine', leaf: 'pine', tint: 0xd8e2e8, core: 0x2a3a30 },
-  scrub: { card: 'hedge', height: 1.1, leaf: 'oak', tint: 0xb4a468, core: 0x5a4e2c }, // matorral seco del desierto
+  scrub: { card: 'hedge', height: 0.9, width: 0.75, cardSize: 0.55, cards: 40, leaf: 'dry', tint: 0xffffff, core: 0x6a5634 }, // matorral seco del desierto
 };
 
 // ------------------------------------------------------------------ tarjetas
@@ -66,7 +66,7 @@ function cardGeometry(kind, seed) {
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
   let branches = null;
   if (k.card === 'hedge') {
-    const H = k.height, rx = 2.15, ry = H * 0.5, cy = H * 0.48;
+    const H = k.height, rx = k.width ?? 2.15, ry = H * 0.5, cy = H * 0.48;
     const core = new THREE.IcosahedronGeometry(1, 2);
     const cp = core.attributes.position;
     for (let i = 0; i < cp.count; i++) {
@@ -76,13 +76,13 @@ function cardGeometry(kind, seed) {
     }
     pushCore(out, core, 1);
     out.coreCount = out.idx.length;
-    for (let i = 0; i < 64; i++) {
+    for (let i = 0; i < (k.cards ?? 64); i++) {
       const a = r() * Math.PI * 2, el = -0.25 + r() * 1.3; // de los lados hacia arriba
       const d = v(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)).normalize();
       const base = v(d.x * rx * 0.62, cy + d.y * ry * 0.62, d.z * rx * 0.62);
       const up = d.clone().add(v((r() - 0.5) * 0.6, 0.35 + r() * 0.3, (r() - 0.5) * 0.6)).normalize();
       const right = new THREE.Vector3().crossVectors(up, v(r() - 0.5, r() - 0.5, r() - 0.5)).normalize();
-      const size = 1.5 + r() * 0.8;
+      const size = (k.cardSize ?? 1.5) * (1 + r() * 0.55);
       const n = d.clone().add(v(0, 0.35, 0)).normalize();
       pushCard(out, base, up, right, size * 0.9, size, n, 0.85 + r() * 0.15);
     }
@@ -197,6 +197,7 @@ function barkMaterial(kind, scale) {
 
 function leafTexture(name) {
   if (name === 'cherry') return tintedLeafTexture('leaves/ash_color.png', [255, 170, 200], 'cherry');
+  if (name === 'dry') return tintedLeafTexture('leaves/ash_color.png', [170, 150, 96], 'dry');
   return tex(`leaves/${name}_color.png`);
 }
 
