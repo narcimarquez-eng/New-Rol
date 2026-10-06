@@ -517,7 +517,7 @@ try {
     return open;
   });
   ok(!locked, 'la puerta del templo no se abre sin la Llave del Sol');
-  await page.evaluate(() => { const g = window.__game; g.godMode = true; window.__t.tp(6.5, 12.6, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.6); });
+  await page.evaluate(() => { const g = window.__game; g.godMode = true; window.__t.tp(6.5, 12.3, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.6); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_sun')), 'el cofre de las ruinas da la Llave del Sol');
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(23.5, 16.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(2.5); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_d_temple')), 'la Llave del Sol abre la puerta del Templo del Sol');
@@ -569,7 +569,7 @@ try {
     t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
     const [wx, wz] = g.zone.tileToWorld(6, 20);
     res.secretPassable = !g.zone.collision.blocked(wx, wz, 0.5);
-    t.tp(5.1, 20, -Math.PI / 2); t.sim(0.3); g.input.press('interact'); t.sim(0.5);
+    t.tp(4.8, 20, -Math.PI / 2); t.sim(0.3); g.input.press('interact'); t.sim(0.5);
     g.mode = 'play'; g.ui.show('itemget', false);
     t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
     res.amulet = pr.questState('q_amulet');
