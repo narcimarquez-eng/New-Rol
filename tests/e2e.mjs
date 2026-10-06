@@ -570,15 +570,20 @@ try {
     const [wx, wz] = g.zone.tileToWorld(6, 20);
     res.secretPassable = !g.zone.collision.blocked(wx, wz, 0.5);
     t.tp(4.8, 20, -Math.PI / 2); t.sim(0.3); g.input.press('interact'); t.sim(0.5);
-    g.mode = 'play'; g.ui.show('itemget', false);
-    t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
-    res.amulet = pr.questState('q_amulet');
     // Aldric: 3 fragmentos solares
     t.tp(21.5, 19.8, Math.PI); t.talk('aldric');
     for (const [c, r] of [[38, 12], [3, 42], [35, 47]]) { t.tp(c, r, 0); t.sim(0.4); }
     t.tp(21.5, 19.8, Math.PI); t.talk('aldric');
     res.shards = pr.questState('q_shards');
     return res;
+  });
+  // el cofre entrega el amuleto con un pequeño retardo (setTimeout): se espera fuera de la página
+  await waitTrue(page, () => window.__game.progress.has('amulet'));
+  quests3.amulet = await page.evaluate(() => {
+    const g = window.__game, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
+    return g.progress.questState('q_amulet');
   });
   ok(quests3.borgReady === 'ready' && quests3.borg === 'done', `misión "Huesos en la arena" (${quests3.borgReady}, ${quests3.borg})`);
   ok(await waitTrue(page, () => window.__game.companions.some((c) => c.id === 'borg')), 'Borg el Bárbaro se une al grupo al completar su misión');
