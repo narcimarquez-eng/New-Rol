@@ -449,13 +449,16 @@ try {
     const e = window.__t.enemies('skeletonMinion').find((m) => m.dormant);
     if (!e) return null;
     const s0 = e.state;
+    // el héroe no apunta a enemigos enterrados (no se ven)
+    const aimHidden = g.combat.nearestEnemy(e.x + 1.5, e.z, 4.5) === e;
     g.player.place(e.x + 4, e.z, 0);
     window.__t.sim(0.2);
     const s1 = e.state;
     const ign = e.hurt(5, g.player.x, g.player.z);
     window.__t.sim(2.2);
-    return { s0, s1, ign, s2: e.state, alive: e.alive };
+    return { s0, s1, ign, s2: e.state, alive: e.alive, aimHidden };
   });
+  ok(awake && !awake.aimHidden, 'el héroe no apunta a los esqueletos enterrados');
   ok(awake && awake.s0 === 'dormant' && awake.s1 === 'awaken' && awake.ign === 'ignored' && awake.alive, `un esqueleto enterrado despierta al acercarse (${JSON.stringify(awake)})`);
 
   // --- escudo del guerrero: para golpes de frente, el remate del combo rompe la guardia ---
@@ -561,9 +564,10 @@ try {
       if (i % 10 === 0) g.input.press('attack');
       g.noRender = true; g.step(1 / 60); g.noRender = false; g.input.endFrame();
     }
-    return { dead: !g.enemies.some((e) => e.def.boss), sawPhase2, sawRise };
+    const b = g.enemies.find((e) => e.def.boss);
+    return { dead: !b, sawPhase2, sawRise, hp: b?.hp, st: b?.state, storm: +g.storm.level.toFixed(2), player: g.player.state, comp: g.companions.map((c) => `${c.id}:${c.state}:${c.target?.kind ?? '-'}`).join(',') };
   });
-  ok(king.dead, 'el Rey de las Arenas puede ser derrotado');
+  ok(king.dead, `el Rey de las Arenas puede ser derrotado (${JSON.stringify(king)})`);
   ok(king.sawPhase2 && king.sawRise, `el Rey de las Arenas entra en su segunda fase y levanta esqueletos (${JSON.stringify(king)})`);
   await page.evaluate(() => window.__t.sim(1));
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(24, 4.1, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });

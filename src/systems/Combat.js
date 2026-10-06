@@ -9,10 +9,11 @@ const SWORD_ARC = 1.15; // radianes a cada lado
 export class Combat {
   constructor(game) { this.game = game; }
 
+  /** Enemigo más cercano al que se puede golpear (no los enterrados ni los que aún se levantan). */
   nearestEnemy(x, z, maxDist) {
     let best = null, bd = maxDist;
     for (const e of this.game.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || e.dormant || e.state === 'awaken') continue;
       const d = Math.hypot(e.x - x, e.z - z) - e.radius;
       if (d < bd) { bd = d; best = e; }
     }
