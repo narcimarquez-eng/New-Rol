@@ -167,15 +167,16 @@ const terrainMats = new Map();
 export function terrainMaterial(variant = 'default') {
   if (terrainMats.has(variant)) return terrainMats.get(variant);
   const desert = variant === 'desert';
+  const castle = variant === 'castle'; // castillo y santuarios: losas grandes y adoquín
   const grass = tex('tex/grass.jpg');
   const sand = desert ? sandTextures() : null;
   const dirt = desert ? sand.map : tex('tex/dirt_color.jpg');
   const dirtN = desert ? sand.normalMap : tex('tex/dirt_normal.jpg', { srgb: false });
-  const cobble = desert ? flagstoneTextures() : cobbleTextures();
-  const snow = desert ? clayTextures() : snowTextures();
+  const cobble = desert || castle ? flagstoneTextures() : cobbleTextures();
+  const snow = desert ? clayTextures() : castle ? cobbleTextures() : snowTextures();
   // escala (repeticiones por unidad) de cada capa
-  const sc = desert ? { d: 0.07, s: 0.15, n: 0.12 } : { d: 0.22, s: 0.5, n: 0.11 };
-  const rough = desert ? new THREE.Vector4(0.96, 0.93, 0.84, 0.95) : new THREE.Vector4(0.97, 0.93, 0.86, 0.72);
+  const sc = desert ? { d: 0.07, s: 0.15, n: 0.12 } : castle ? { d: 0.22, s: 0.13, n: 0.4 } : { d: 0.22, s: 0.5, n: 0.11 };
+  const rough = desert ? new THREE.Vector4(0.96, 0.93, 0.84, 0.95) : castle ? new THREE.Vector4(0.97, 0.93, 0.78, 0.86) : new THREE.Vector4(0.97, 0.93, 0.86, 0.72);
   const avg = { g: new THREE.Color(0.2, 0.3, 0.1), d: new THREE.Color(0.3, 0.25, 0.2), s: new THREE.Color(0.4, 0.4, 0.4), n: new THREE.Color(0.9, 0.9, 0.95) };
   averageColor(grass, avg.g); averageColor(dirt, avg.d);
   averageColor(cobble.map, avg.s); averageColor(snow.map, avg.n);

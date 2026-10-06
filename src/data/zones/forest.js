@@ -89,10 +89,14 @@ export default {
     { type: 'spawn', id: 'fromCaves', tile: [22.5, 3], facing: 0 },
     { type: 'portal', tile: [22, 45], span: 2, to: 'village', spawn: 'fromForest', label: 'Aldea Inicial' },
     { type: 'portal', tile: [22, 0], span: 2, to: 'caves', spawn: 'fromForest', label: 'Cuevas Heladas' },
+    // santuario de las Luciérnagas (prueba mágica: braseros y runas)
+    { type: 'spawn', id: 'fromShrine', tile: [40.5, 38], facing: 0 },
+    { type: 'portal', tile: [40, 36], span: 2, to: 'shrine_forest', spawn: 'fromForest', label: 'Santuario de las Luciérnagas' },
+    { type: 'sign', tile: [38.4, 37.4], text: 'SANTUARIO DE LAS LUCIÉRNAGAS\nQuien supere sus pruebas recibirá el Emblema del Bosque, que despierta la verja del laberinto.' },
 
     // --- puertas ---
-    { type: 'door', id: 'f_maze_gate', tile: [22, 23], span: 2, requires: { item: 'key_maze' }, consume: true, style: 'stone',
-      lockedText: 'Una verja cubierta de enredaderas. Tiene una cerradura con forma de hoja: necesitas la Llave del Laberinto.' },
+    { type: 'door', id: 'f_maze_gate', tile: [22, 23], span: 2, requires: { all: [{ item: 'key_maze' }, { item: 'emblem_forest' }] }, consume: 'key_maze', style: 'stone',
+      lockedText: 'Una verja cubierta de enredaderas. Tiene una cerradura con forma de hoja (la Llave del Laberinto) y el hueco de un emblema: el del Santuario de las Luciérnagas, al este.' },
     { type: 'door', id: 'f_north_gate', tile: [22, 1], span: 2, requires: { item: 'key_forest' }, consume: true, style: 'stone',
       lockedText: 'Una gran puerta tallada en madera viva. Solo la Llave del Bosque puede abrirla.' },
 

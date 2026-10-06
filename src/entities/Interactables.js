@@ -9,15 +9,17 @@ import { ITEMS } from '../data/items.js';
 import { TILE } from '../world/tiles.js';
 import { dampAngle } from '../core/utils.js';
 import { addOutline } from '../gfx/ModelKit.js';
+import { buildStoneBlock } from '../world/PuzzleProps.js';
+import { castleStone } from '../world/CastleProps.js';
 
 /** Contorno de tinta para todas las mallas opacas de un objeto. */
-function outlineAll(obj, t = 0.04) {
+export function outlineAll(obj, t = 0.04) {
   const meshes = [];
   obj.traverse((o) => { if (o.isMesh && !o.material.transparent && o.material.type !== 'MeshBasicMaterial' && o.name !== 'outline') meshes.push(o); });
   for (const m of meshes) addOutline(m, t);
 }
 
-class Base {
+export class Base {
   constructor(game, data) {
     this.game = game;
     this.data = data;
@@ -223,7 +225,8 @@ export class Door extends Base {
     const span = data.span || 1;
     const width = span * TILE;
     const keyColor = data.requires?.item ? ITEMS[data.requires.item].color : 0xc9a227;
-    this.mesh = P.buildGate({ width, color: keyColor, style: data.style || 'wood' });
+    const tint = game.zone.data.stoneTint;
+    this.mesh = P.buildGate({ width, color: keyColor, style: data.style || 'wood', stone: tint != null ? castleStone(tint) : null });
     outlineAll(this.mesh, 0.04);
     this.root.add(this.mesh);
     this.open = game.progress.flags.has(`opened_${this.id}`);
@@ -247,7 +250,9 @@ export class Door extends Base {
       g.setMode('dialog');
       return;
     }
-    if (req?.item && this.data.consume) g.progress.take(req.item);
+    // consume: true gasta el objeto requerido; una cadena gasta ese objeto concreto
+    const take = this.data.consume === true ? req?.item : this.data.consume;
+    if (take) g.progress.take(take);
     this.openDoor();
   }
   openDoor() {
@@ -427,23 +432,27 @@ export class Portal extends Base {
 // ---------------- puzles de hielo ----------------
 const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-/** Bloque de hielo que se empuja caminando contra él; sobre el hielo se desliza. */
+/**
+ * Bloque que se empuja caminando contra él: de hielo (por defecto) o de piedra
+ * (data.style = 'stone'). Cualquiera de los dos se desliza sobre el hielo.
+ */
 export class IceBlock extends Base {
   constructor(game, data) {
     super(game, data);
     this.id = data.id;
-    this.kind = 'iceblock';
+    this.stone = data.style === 'stone';
+    this.kind = this.stone ? 'stoneblock' : 'iceblock';
     this.group = data.group;
     this.home = [Math.round(data.tile[0]), Math.round(data.tile[1])];
     this.tile = [...this.home];
-    this.mesh = P.buildIceBlock();
+    this.mesh = this.stone ? buildStoneBlock() : P.buildIceBlock();
     outlineAll(this.mesh, 0.05);
     this.root.add(this.mesh);
-    this.collider = game.zone.collision.addBox(this.x, this.z, TILE * 0.88, TILE * 0.88, { tall: true, height: 3.2, tag: 'iceblock' });
+    this.collider = game.zone.collision.addBox(this.x, this.z, TILE * 0.88, TILE * 0.88, { tall: true, height: 3.2, tag: this.kind });
     this.pushT = 0;
     this.moving = null; // { dir, to }
     this.locked = false; // sobre su placa: ya no se mueve
-    this.mapColor = '#bfefff';
+    this.mapColor = this.stone ? '#d8c8a8' : '#bfefff';
   }
 
   setTile(c, r) {
@@ -487,7 +496,7 @@ export class IceBlock extends Base {
     if (this.locked) return;
     this.moving = null;
     this.setTile(...this.home);
-    this.game.particles.puff(this.x, this.y + 1, this.z, { color: 0xcff6ff, count: 14, size: 2.4 });
+    this.game.particles.puff(this.x, this.y + 1, this.z, { color: this.stone ? 0xd8ccb0 : 0xcff6ff, count: 14, size: 2.4 });
   }
 
   update(dt) {

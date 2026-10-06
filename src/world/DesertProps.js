@@ -219,8 +219,9 @@ export function ruinWalls(tiles) {
 }
 
 /** Columnas: tambores apilados con basa y capitel; algunas rotas. items: [{x,y,z,ry,broken}] */
-export function columns(items) {
+export function columns(items, mat = null) {
   const g = new THREE.Group();
+  const m = mat || sandstone();
   const build = (broken) => {
     const parts = [new THREE.BoxGeometry(1.9, 0.45, 1.9).translate(0, 0.22, 0)];
     const drums = broken ? 3 : 6;
@@ -234,8 +235,8 @@ export function columns(items) {
     return paint(mergeGeometries(parts.map((p) => { p.deleteAttribute('uv'); return p.toNonIndexed(); })), 0xf0dfc4, 0.25);
   };
   const full = items.filter((i) => !i.broken), broken = items.filter((i) => i.broken);
-  if (full.length) g.add(instanced(build(false), sandstone(), full));
-  if (broken.length) g.add(instanced(build(true), sandstone(), broken));
+  if (full.length) g.add(instanced(build(false), m, full));
+  if (broken.length) g.add(instanced(build(true), m, broken));
   return g;
 }
 

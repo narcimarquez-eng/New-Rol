@@ -17,12 +17,18 @@ for (const z of Object.values(ZONES)) {
   ok(unknown.size === 0, `${z.id}: sin caracteres desconocidos ${[...unknown].join('')}`);
   const at = (c, r) => TILES[z.map[Math.floor(r)]?.[Math.floor(c)]] || { solid: 'box' };
   for (const e of z.entities) {
-    if (!['npc', 'chest', 'enemy', 'pickup', 'spawn', 'dummy', 'sign', 'torch'].includes(e.type)) continue;
+    if (!['npc', 'chest', 'enemy', 'pickup', 'spawn', 'dummy', 'sign', 'torch', 'brazier', 'mirror', 'beamsource', 'beamtarget', 'switch', 'barrier', 'rune', 'runetablet', 'stoneblock', 'plate', 'resetstone'].includes(e.type)) continue;
     const t = at(e.tile[0] + 0.5, e.tile[1] + 0.5);
     const walk = !t.solid || t.cuttable;
     ok(walk, `${z.id}: ${e.type} ${e.id || e.kind || ''} en casilla transitable [${e.tile}]`);
     if (e.item) ok(!!ITEMS[e.item], `${z.id}: objeto ${e.item} existe`);
     if (e.kind && e.type === 'enemy') ok(!!ENEMIES[e.kind], `${z.id}: enemigo ${e.kind} existe`);
+  }
+  // los santuarios son zonas pequeñas de acertijos: sin misiones propias
+  const shrine = z.id.startsWith('shrine_');
+  if (shrine) {
+    ok(z.entities.some((e) => e.type === 'chest' && /^emblem_/.test(e.item)), `${z.id}: guarda un emblema`);
+    continue;
   }
   const quests = Object.values(QUESTS).filter((q) => q.zone === z.id);
   ok(quests.length >= 3, `${z.id}: ${quests.length} misiones secundarias (>= 3)`);

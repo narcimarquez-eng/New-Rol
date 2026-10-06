@@ -353,6 +353,105 @@ export function flagstoneTextures() {
   });
 }
 
+/** Sillería de castillo: hiladas de bloques de piedra de ancho variable con juntas hundidas. */
+export function ashlarTextures() {
+  return cached('ashlar', () => {
+    const size = 512, rows = 8, r = rng(71);
+    // cortes de cada hilada (suman el ancho completo: la textura se repite sin costuras)
+    const courses = [];
+    for (let row = 0; row < rows; row++) {
+      const n = 3 + Math.floor(r() * 2);
+      const ws = Array.from({ length: n }, () => 0.7 + r() * 0.6);
+      const sum = ws.reduce((a, b) => a + b, 0);
+      const xs = [0];
+      for (const w of ws) xs.push(xs[xs.length - 1] + (w / sum) * size);
+      courses.push({ xs, off: r() * size });
+    }
+    const tone = fbmTile(size, rng(72), [[4, 0.5], [9, 0.3], [20, 0.2]]);
+    const grain = fbmTile(size, rng(73), [[64, 0.4], [128, 0.35], [256, 0.25]]);
+    const chips = fbmTile(size, rng(74), [[16, 0.6], [32, 0.4]]);
+    const cellRand = Array.from({ length: rows * 5 }, () => r());
+    return build(size, (x, y, i) => {
+      const rowH = size / rows;
+      const row = Math.floor(y / rowH);
+      const cr = courses[row];
+      const xs = (x + cr.off) % size;
+      let col = 0;
+      while (col < cr.xs.length - 2 && xs >= cr.xs[col + 1]) col++;
+      const ex = Math.min(xs - cr.xs[col], cr.xs[col + 1] - xs), ey = Math.min(y - row * rowH, (row + 1) * rowH - y);
+      const e = Math.min(ex, ey) + (chips[i] - 0.5) * 6;
+      const joint = 1 - smoothstep(1.5, 4.5, e);
+      const bevel = smoothstep(0, 10, e);
+      const cv = cellRand[row * 5 + col];
+      const h = bevel * 1.0 - joint * 1.6 + (tone[i] - 0.5) * 0.6 + (grain[i] - 0.5) * 0.4;
+      let v = 0.74 + (cv - 0.5) * 0.18 + (tone[i] - 0.5) * 0.16 + (grain[i] - 0.5) * 0.1;
+      v *= 1 - joint * 0.45;
+      const warm = (cv - 0.5) * 10;
+      return { r: clamp255(v * 200 + warm), g: clamp255(v * 194 + warm * 0.6), b: clamp255(v * 184), h, rough: 0.82 + joint * 0.12 };
+    }, { normalStrength: 1.6 });
+  });
+}
+
+/** Alfombra roja con cenefa dorada en los bordes largos (u = ancho, v = largo, se repite en v). */
+export function carpetTexture() {
+  return cached('carpet', () => {
+    const W = 256, H = 256;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#7a1420'; c.fillRect(0, 0, W, H);
+    // trama del tejido
+    const r = rng(91);
+    for (let k = 0; k < 4000; k++) { c.fillStyle = `rgba(${r() < 0.5 ? '0,0,0' : '255,120,120'},${0.04 + r() * 0.05})`; c.fillRect(r() * W, r() * H, 1 + r() * 2, 1); }
+    // cenefa
+    for (const x0 of [0, W - 34]) {
+      c.fillStyle = '#c9962e'; c.fillRect(x0, 0, 34, H);
+      c.fillStyle = '#5a0e16'; c.fillRect(x0 + 6, 0, 22, H);
+      c.fillStyle = '#d8a83e';
+      for (let y = 0; y < H; y += 32) { c.beginPath(); c.moveTo(x0 + 17, y + 4); c.lineTo(x0 + 26, y + 16); c.lineTo(x0 + 17, y + 28); c.lineTo(x0 + 8, y + 16); c.closePath(); c.fill(); }
+    }
+    // rombos centrales
+    c.strokeStyle = 'rgba(214,160,60,0.55)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(W / 2, 30); c.lineTo(W / 2 + 50, H / 2); c.lineTo(W / 2, H - 30); c.lineTo(W / 2 - 50, H / 2); c.closePath(); c.stroke();
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    return t;
+  });
+}
+
+/** Estandarte del reino (o del enemigo): tela con escudo bordado. */
+export function bannerTexture(kind = 'royal') {
+  return cached(`banner-${kind}`, () => {
+    const W = 128, H = 256;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    const base = kind === 'royal' ? '#1d3f8a' : '#3a1446';
+    const trim = kind === 'royal' ? '#d8b04a' : '#a07ad0';
+    c.fillStyle = base; c.fillRect(0, 0, W, H);
+    // borde y punta en V
+    c.fillStyle = trim; c.fillRect(0, 0, W, 10); c.fillRect(0, 0, 8, H); c.fillRect(W - 8, 0, 8, H);
+    c.globalCompositeOperation = 'destination-out';
+    c.beginPath(); c.moveTo(0, H); c.lineTo(W / 2, H - 40); c.lineTo(W, H); c.closePath(); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    // emblema: escudo con sol (reino) o calavera estilizada (sombras)
+    c.fillStyle = trim;
+    c.beginPath(); c.moveTo(W / 2 - 34, 60); c.lineTo(W / 2 + 34, 60); c.lineTo(W / 2 + 34, 110); c.quadraticCurveTo(W / 2 + 30, 150, W / 2, 165); c.quadraticCurveTo(W / 2 - 30, 150, W / 2 - 34, 110); c.closePath(); c.fill();
+    c.fillStyle = base;
+    if (kind === 'royal') {
+      c.beginPath(); c.arc(W / 2, 108, 16, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = base; c.lineWidth = 4;
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; c.beginPath(); c.moveTo(W / 2 + Math.cos(a) * 20, 108 + Math.sin(a) * 20); c.lineTo(W / 2 + Math.cos(a) * 28, 108 + Math.sin(a) * 28); c.stroke(); }
+    } else {
+      c.beginPath(); c.arc(W / 2, 102, 18, 0, Math.PI * 2); c.fill();
+      c.fillRect(W / 2 - 10, 112, 20, 18);
+      c.fillStyle = trim; c.fillRect(W / 2 - 9, 98, 6, 7); c.fillRect(W / 2 + 3, 98, 6, 7);
+    }
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    return t;
+  });
+}
+
 /** Tierra agrietada por la sequía (placas de Voronoi con bordes levantados). */
 export function clayTextures() {
   return cached('clay', () => {

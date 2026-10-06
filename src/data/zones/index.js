@@ -4,6 +4,13 @@ import village from './village.js';
 import forest from './forest.js';
 import caves from './caves.js';
 import desert from './desert.js';
+import shrineForest from './shrine_forest.js';
+import shrineIce from './shrine_ice.js';
+import shrineSun from './shrine_sun.js';
 
-export const ZONES = { village, forest, caves, desert };
+export const ZONES = {
+  village, forest, caves, desert,
+  // santuarios de las pruebas mágicas
+  shrine_forest: shrineForest, shrine_ice: shrineIce, shrine_sun: shrineSun,
+};
 export const START_ZONE = 'village';

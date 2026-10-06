@@ -111,6 +111,9 @@ export default {
     { type: 'spawn', id: 'fromCaves', tile: [23.5, 48.5], facing: Math.PI },
     { type: 'spawn', id: 'fromCastle', tile: [23.5, 4.5], facing: 0 },
     { type: 'portal', tile: [23, 51], span: 2, to: 'caves', spawn: 'fromDesert', label: 'Cuevas Heladas' },
+    // santuario del Sol (prueba mágica: braseros en cadena y espejos)
+    { type: 'spawn', id: 'fromShrine', tile: [41.5, 11], facing: Math.PI },
+    { type: 'portal', tile: [41, 13], span: 2, to: 'shrine_sun', spawn: 'fromDesert', label: 'Santuario del Sol' },
     {
       type: 'portal', tile: [23, 0], span: 2, to: 'castle', spawn: 'fromDesert', label: 'Castillo Final', flag: 'phase3_complete',
       requires: { item: 'key_castle' }, lockedText: 'Una barrera de luz cierra el paso. Hace falta la Llave del Castillo.',
@@ -153,8 +156,8 @@ export default {
       talk: [{ lines: ['Estos esqueletos del cañón lanzan orbes mágicos de tres en tres. Esquívalos rodando hacia un lado.'] }] },
 
     // --- puerta del templo y cofres ---
-    { type: 'door', id: 'd_temple', tile: [23, 16], span: 2, requires: { item: 'key_sun' }, consume: true, style: 'stone',
-      lockedText: 'Una gran losa de piedra con un sol grabado. En el centro hay una cerradura de oro con forma de sol.' },
+    { type: 'door', id: 'd_temple', tile: [23, 16], span: 2, requires: { all: [{ item: 'key_sun' }, { item: 'emblem_sun' }] }, consume: 'key_sun', style: 'stone',
+      lockedText: 'Una gran losa de piedra con un sol grabado. Tiene una cerradura de oro con forma de sol (la Llave del Sol) y el hueco de un emblema: el del Santuario del Sol, en el cañón del noreste.' },
     { type: 'chest', id: 'd_sun', tile: [6.5, 11.5], item: 'key_sun', facing: Math.PI },
     { type: 'chest', id: 'd_amulet', tile: [4, 20], item: 'amulet', facing: Math.PI / 2, secret: true },
     { type: 'chest', id: 'd_east', tile: [44.5, 32.5], item: 'heart_container', facing: -Math.PI / 2, secret: true },

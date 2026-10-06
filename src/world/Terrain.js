@@ -8,7 +8,7 @@ import { REALISTIC } from '../gfx/Style.js';
 import { terrainMaterial } from '../gfx/Materials.js';
 
 // capa de textura del terreno realista por tipo de suelo: césped, tierra, piedra, nieve
-const LAYER = { grass: 0, forest: 0, path: 1, sand: 1, water: 1, stone: 2, flagstone: 2, snow: 3, ice: 3, clay: 3 };
+const LAYER = { grass: 0, forest: 0, path: 1, sand: 1, water: 1, stone: 2, flagstone: 2, snow: 3, ice: 3, clay: 3, cobble: 3 };
 
 const SUB = 2; // vértices por casilla (resolución)
 

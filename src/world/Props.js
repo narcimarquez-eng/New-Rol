@@ -490,8 +490,8 @@ export function buildChest({ big = false } = {}) {
 }
 
 /** Puerta/verja con cerradura. color indica la llave necesaria. */
-export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) {
-  if (style === 'stone') return stoneGate(width, color);
+export function buildGate({ width = 4, color = 0xc9a227, style = 'wood', stone = null } = {}) {
+  if (style === 'stone') return stoneGate(width, color, stone);
   const g = new THREE.Group();
   const icy = style === 'ice' || style === 'icewall';
   const frameCol = icy ? 0x7f93ad : 0x6d6d6d, frameCol2 = icy ? 0x6f839d : 0x5d5d5d;
@@ -529,9 +529,10 @@ export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) 
 }
 
 /** Puerta de templo: losa de arenisca entre dos pilares, con un sol de oro (la cerradura). */
-function stoneGate(width, color) {
+function stoneGate(width, color, customStone = null) {
   const g = new THREE.Group();
-  const stone = triplanar({ key: 'sandstone-gate', set: sandstoneTextures(), scale: 0.3, normalStrength: 1, vertexColors: true, color: 0xffffff });
+  // por defecto arenisca (desierto); los santuarios y el castillo pasan su propia sillería
+  const stone = customStone || triplanar({ key: 'sandstone-gate', set: sandstoneTextures(), scale: 0.3, normalStrength: 1, vertexColors: true, color: 0xffffff });
   const frame = new THREE.Mesh(smerge([
     spart(new THREE.BoxGeometry(1.0, 5.6, 1.2), 0xf0dcc0, { x: -width / 2 - 0.2, y: 2.8, ao: 0.3 }),
     spart(new THREE.BoxGeometry(1.0, 5.6, 1.2), 0xf0dcc0, { x: width / 2 + 0.2, y: 2.8, ao: 0.3 }),

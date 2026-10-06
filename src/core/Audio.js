@@ -115,6 +115,12 @@ export class Audio {
       case 'death': [67, 63, 60, 55].forEach((n, i) => this.tone(NOTE(n), 0.4, { type: 'triangle', vol: 0.2, delay: i * 0.25 })); break;
       case 'boss': [43, 46, 43, 49].forEach((n, i) => this.tone(NOTE(n), 0.35, { type: 'sawtooth', vol: 0.15, delay: i * 0.3 })); break;
       case 'stamina': this.tone(140, 0.1, { type: 'square', vol: 0.06 }); break;
+      case 'ignite': this.noise(0.5, { vol: 0.28, freq: 700, sweep: 1800, q: 0.6 }); this.tone(NOTE(67), 0.25, { type: 'triangle', vol: 0.08, delay: 0.05 }); break;
+      case 'fizzle': this.noise(0.45, { vol: 0.18, freq: 3000, sweep: -2500, q: 0.4 }); break;
+      case 'switch': this.tone(NOTE(84), 0.12, { type: 'square', vol: 0.12 }); this.tone(NOTE(79), 0.18, { type: 'triangle', vol: 0.15, delay: 0.08 }); this.noise(0.3, { vol: 0.12, freq: 300, type: 'lowpass' }); break;
+      case 'rune': this.tone(NOTE(76 + Math.floor(Math.random() * 3) * 2), 0.35, { type: 'sine', vol: 0.18 }); this.tone(NOTE(88), 0.3, { type: 'sine', vol: 0.06, delay: 0.05 }); break;
+      case 'mirror': this.noise(0.2, { vol: 0.15, freq: 500, q: 1.5 }); this.tone(NOTE(91), 0.08, { type: 'triangle', vol: 0.08, delay: 0.12 }); break;
+      case 'beam': [79, 86].forEach((n, i) => this.tone(NOTE(n), 0.3, { type: 'sine', vol: 0.1, delay: i * 0.06 })); break;
       default: break;
     }
   }

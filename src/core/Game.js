@@ -14,6 +14,7 @@ import { COMPANIONS } from '../data/companions.js';
 import { charactersReady } from '../gfx/Characters.js';
 import { Enemy } from '../entities/Enemy.js';
 import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetStone } from '../entities/Interactables.js';
+import { createPuzzleEntity } from '../entities/Puzzles.js';
 import { Particles } from '../systems/Particles.js';
 import { Projectiles } from '../systems/Projectiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
@@ -180,8 +181,11 @@ export class Game {
     this.sun.target.position.set(p.x, 0, p.z);
     // las luces puntuales se asignan a las antorchas más cercanas
     const torches = this.zone.torches
-      .map((t) => ({ t, d: Math.hypot(t.x - p.x, t.z - p.z) }))
-      .sort((a, b) => a.d - b.d);
+      .filter((t) => !t.off)
+      .map((t) => ({ t, d: Math.hypot(t.x - p.x, t.z - p.z) }));
+    // la espada en llamas también ilumina
+    if (p.flameT > 0 && p.flameLight) torches.push({ t: p.flameLight, d: 0 });
+    torches.sort((a, b) => a.d - b.d);
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const l = this.pointLights[i];
       const e = torches[i];
@@ -282,6 +286,7 @@ export class Game {
       for (const i of this.interactables) { this.scene.remove(i.root); i.dispose(); }
     }
     this.enemies = []; this.interactables = []; this.dummies = [];
+    this.switchState = 0; // cristales de cambio: 0 = barreras rojas levantadas
     if (this.ui.dialog) this.ui.closeDialog();
     this.talkingNpc = null;
     this.particles.clear();
@@ -308,6 +313,9 @@ export class Game {
         case 'iceblock': this.addInteractable(new IceBlock(this, e)); break;
         case 'plate': this.addInteractable(new Plate(this, e)); break;
         case 'resetstone': this.addInteractable(new ResetStone(this, e)); break;
+        case 'brazier': case 'mirror': case 'beamsource': case 'beamtarget': case 'switch':
+        case 'barrier': case 'rune': case 'runetablet': case 'stoneblock':
+          this.addInteractable(createPuzzleEntity(this, e)); break;
         case 'pickup':
           if (!this.progress.flags.has(`picked_${e.id}`)) this.addInteractable(new Pickup(this, e));
           break;

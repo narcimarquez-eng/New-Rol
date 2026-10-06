@@ -78,6 +78,21 @@ export class Player {
     } else if (on) this.swordGlow.material.color.set(color).multiplyScalar(1.6);
   }
 
+  /** Prende fuego a la espada durante t segundos (para encender braseros). */
+  igniteSword(t) {
+    this.flameT = Math.max(this.flameT || 0, t);
+    if (!this.model.weapon) return;
+    if (!this.fireGlow) {
+      const L = this.model.bladeLength ?? 1.35;
+      this.fireGlow = new THREE.Mesh(new THREE.BoxGeometry(0.24 * L / 1.35, L * 0.85, 0.1 * L / 1.35),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff7a20).multiplyScalar(2.2), transparent: true, opacity: 0.6, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+      this.fireGlow.position.y = L * 0.55;
+      this.model.weapon.add(this.fireGlow);
+      this.flameLight = { obj: { userData: {} }, x: 0, y: 0, z: 0, phase: 0, color: 0xff8a3a };
+    }
+    this.fireGlow.visible = true;
+  }
+
   /** Congelación: ralentiza al jugador unos segundos. */
   chill(t) {
     this.chillT = Math.max(this.chillT, t);
@@ -203,6 +218,22 @@ export class Player {
     if (this.chillT > 0) {
       this.chillT -= dt;
       if (Math.random() < dt * 8) g.particles.spawn(this.pos.x + (Math.random() - 0.5), this.pos.y + 0.5 + Math.random(), this.pos.z + (Math.random() - 0.5), { color: 0xcff6ff, size: 0.5, life: 0.6, gravity: 1 });
+    }
+    // espada en llamas: brasas en la hoja, luz y aviso cuando está a punto de apagarse
+    if (this.flameT > 0) {
+      this.flameT -= dt;
+      const tip = this.model.weaponTip(this._ftip || (this._ftip = new THREE.Vector3()));
+      if (tip) {
+        if (Math.random() < 0.6) g.particles.spawn(tip.x, tip.y, tip.z, { color: Math.random() < 0.5 ? 0xffb040 : 0xff6a20, size: 0.7, life: 0.45, gravity: -2.5, vx: (Math.random() - 0.5), vz: (Math.random() - 0.5), vy: 1 });
+        Object.assign(this.flameLight, { x: tip.x, y: tip.y, z: tip.z });
+      }
+      if (this.fireGlow) this.fireGlow.material.opacity = this.flameT < 2.5 ? 0.25 + Math.abs(Math.sin(this.flameT * 10)) * 0.4 : 0.55 + Math.sin(g.time * 18) * 0.08;
+      if (this.flameT <= 0) {
+        this.flameT = 0;
+        if (this.fireGlow) this.fireGlow.visible = false;
+        g.particles.puff(this.pos.x, this.pos.y + 1.2, this.pos.z, { color: 0x777777, count: 6, size: 1.2 });
+        g.audio.sfx('fizzle');
+      }
     }
     if (this.poisonT > 0) {
       this.poisonT -= dt; this.poisonTick -= dt;

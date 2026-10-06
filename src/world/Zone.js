@@ -7,6 +7,7 @@ import { Terrain } from './Terrain.js';
 import { Collision } from './Collision.js';
 import * as P from './Props.js';
 import * as D from './DesertProps.js';
+import * as CP from './CastleProps.js';
 import { buildSky, buildClouds, buildMountains, buildWater } from './Sky.js';
 import { rng, hash2 } from '../core/utils.js';
 import { buildGrass } from './Grass.js';
@@ -140,7 +141,7 @@ export class Zone {
   /** Recorre el mapa y genera las mallas instanciadas por tipo de objeto. */
   buildTiles() {
     const pal = this.palette;
-    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [], ruin: [], column: [], cactus: [], palm: [], scrub: [] };
+    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [], ruin: [], column: [], cactus: [], palm: [], scrub: [], castlewall: [], tower: [] };
     const rockWalls = this.data.wallStyle === 'rock';
     const r = rng(this.data.terrain?.seed ?? 1);
     this.bushIndex = new Map(); // "c,r" -> índice de instancia
@@ -186,6 +187,8 @@ export class Zone {
           case 'crystal': lists.crystal.push({ x: x + jx * 0.5, y, z: z + jz * 0.5, ry: rot, s: sc }); this.torches.push({ x, z, y: y + 1.4, phase: rot, color: this.palette.crystalLight ?? 0x7fd8ff, crystal: true, obj: { userData: {} } }); break;
           case 'iceSheet': break;
           case 'ruin': lists.ruin.push({ x, z, y, c, r: row, secret: info.secret }); break;
+          case 'castlewall': lists.castlewall.push({ x, z, y, c, r: row, secret: info.secret }); break;
+          case 'tower': lists.tower.push({ x, z, y }); break;
           case 'column': lists.column.push({ x, y: y - 0.1, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, broken: hash2(c, row, 6) < 0.35 }); break;
           case 'cactus': lists.cactus.push({ x: x + jx, y: y - 0.1, z: z + jz, ry: rot, s: sc }); break;
           case 'palm': lists.palm.push({ x: x + jx * 0.6, y: y - 0.1, z: z + jz * 0.6, ry: rot, s: 0.9 + hash2(c, row, 4) * 0.25 }); break;
@@ -219,7 +222,12 @@ export class Zone {
     };
     // objetos del desierto (mismos modelos en los dos estilos)
     if (lists.ruin.length) this.group.add(D.ruinWalls(lists.ruin));
-    if (lists.column.length) this.group.add(D.columns(lists.column));
+    if (lists.column.length) this.group.add(D.columns(lists.column, this.data.stoneTint != null ? CP.castleStone(this.data.stoneTint) : null));
+    if (lists.castlewall.length) {
+      const isWall = (c, r) => { const p = tileInfo(this.charAt(c, r)).prop; return p === 'castlewall' || p === 'tower' || p === 'cliff' || c < 0 || r < 0 || c >= this.W || r >= this.H; };
+      this.group.add(CP.castleWalls(lists.castlewall, isWall, { tint: this.data.stoneTint ?? 0xffffff, height: this.data.wallHeight ?? 7.2 }));
+    }
+    if (lists.tower.length) this.group.add(CP.towers(lists.tower, { tint: this.data.stoneTint ?? 0xffffff }));
     if (lists.cactus.length) this.group.add(D.cacti(lists.cactus));
     if (lists.palm.length) this.group.add(D.palms(lists.palm));
     if (lists.scrub.length) this.group.add(treeInstances('scrub', lists.scrub, { seed: 1, castShadow: false }));
@@ -378,6 +386,11 @@ export class Zone {
           ]), P.toonMat()); break;
           case 'campfire': obj = this.buildCampfire(); break;
           case 'tent': obj = D.tent(e.color); break;
+          case 'carpet': obj = CP.carpet(e.size[0] * TILE * 0.8, e.size[1] * TILE); break;
+          case 'banner': obj = CP.banner(e.style); break;
+          case 'knight': obj = CP.knightStatue({ pose: e.pose, t: e.t }); break;
+          case 'throne': obj = CP.throne(); break;
+          case 'bookshelf': obj = CP.bookshelf(); break;
           case 'jar': obj = D.jar(); break;
           case 'log':
             if (REALISTIC) { obj = new THREE.Group(); const l = P.logReal(2.2, 0.35); l.position.y = 0.33; obj.add(l); break; }

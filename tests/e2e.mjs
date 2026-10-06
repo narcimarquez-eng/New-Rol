@@ -65,6 +65,41 @@ try {
   await page.evaluate(() => {
     const g = window.__game;
     window.__t = {
+      // movimientos estrictos por casillas (N/S/E/W; H = golpear el cristal más cercano):
+      // falla si el héroe choca con un muro, una barrera levantada o un bloque que no se mueve
+      run(moves) {
+        g.godMode = true;
+        const D = { N: [0, -1], S: [0, 1], W: [-1, 0], E: [1, 0] }, KEY = { N: 'up', S: 'down', W: 'left', E: 'right' };
+        const sim = (sec) => { g.noRender = true; for (let i = 0; i < Math.max(1, Math.round(sec * 60)); i++) { g.cam.yaw = 0; g.cam.idleLook = 0; g.step(1 / 60); g.input.endFrame(); } g.noRender = false; };
+        const tileNow = () => g.zone.collision.tileOf(g.player.x, g.player.z);
+        for (const [k, m] of moves.entries()) {
+          const [c, r] = tileNow();
+          const [x0, z0] = g.zone.tileToWorld(c, r);
+          if (m === 'H') {
+            const sw = g.interactables.filter((i) => i.kind === 'switch').sort((a, b) => Math.hypot(a.x - x0, a.z - z0) - Math.hypot(b.x - x0, b.z - z0))[0];
+            const s0 = g.switchState, a = Math.atan2(x0 - sw.x, z0 - sw.z);
+            g.player.place(sw.x + Math.sin(a) * 1.8, sw.z + Math.cos(a) * 1.8, a + Math.PI);
+            sim(0.05); g.input.press('interact'); sim(0.6);
+            g.player.place(x0, z0, g.player.facing); sim(0.05);
+            if (g.switchState === s0) return { fail: k, why: 'el cristal no cambia' };
+            continue;
+          }
+          const n = [c + D[m][0], r + D[m][1]];
+          const block = g.interactables.find((i) => (i.kind === 'iceblock' || i.kind === 'stoneblock') && i.tile[0] === n[0] && i.tile[1] === n[1]);
+          if (block) {
+            g.input.down.add(KEY[m]); sim(0.5);
+            for (let j = 0; j < 40 && !block.moving; j++) sim(0.05);
+            g.input.down.delete(KEY[m]);
+            for (let j = 0; j < 120 && block.moving; j++) sim(0.05);
+            if (block.tile[0] === n[0] && block.tile[1] === n[1]) return { fail: k, why: `el bloque de ${n} no se mueve` };
+          } else {
+            const [x, z] = g.zone.tileToWorld(n[0], n[1]);
+            if (g.zone.collision.blocked(x, z, 0.45)) return { fail: k, why: `paso bloqueado en ${n}` };
+          }
+          const [x, z] = g.zone.tileToWorld(n[0], n[1]); g.player.place(x, z, g.player.facing); sim(0.03);
+        }
+        return { tile: tileNow() };
+      },
       tp(c, r, facing = Math.PI) { const [x, z] = g.zone.tileToWorld(c, r); g.player.place(x, z, facing); g.cam.snapBehind(g.player); },
       pos() { return { x: g.player.x, z: g.player.z }; },
       sim(seconds) { g.noRender = true; for (let i = 0; i < seconds * 60; i++) g.step(1 / 60); g.noRender = false; },
@@ -219,6 +254,53 @@ try {
   await page.evaluate(() => { window.__game.godMode = true; window.__t.tp(3, 25.5, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(0.5); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_maze')), 'el cofre del claro oeste da la Llave del Laberinto');
   await page.screenshot({ path: `${OUT}/08-forest-chest.png` });
+
+  // ---------- Santuario de las Luciérnagas: braseros con tiempo y runas ----------
+  ok(await page.evaluate(() => {
+    const g = window.__game;
+    window.__t.tp(22.5, 23.75, Math.PI); window.__t.sim(0.2); g.input.press('interact'); window.__t.sim(1);
+    if (g.ui.dialog) g.ui.closeDialog();
+    g.mode = 'play';
+    return !g.progress.flags.has('opened_f_maze_gate') && g.progress.has('key_maze');
+  }), 'la verja del laberinto no se abre solo con la llave (falta el Emblema del Bosque)');
+  await page.evaluate(() => { window.__t.tp(40.5, 36, Math.PI); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'shrine_forest' && !window.__game.transitioning, 30000), 'el arco del claro lleva al Santuario de las Luciérnagas');
+  const fire = await page.evaluate(() => {
+    const g = window.__game, p = g.player, t = window.__t;
+    g.mode = 'play'; g.godMode = true;
+    const br = (id) => g.interactables.find((i) => i.id === id);
+    const near = (b) => { p.place(b.x, b.z + 2.2, Math.PI); t.sim(0.1); g.input.press('interact'); t.sim(0.2); };
+    const res = {};
+    near(br('sf_b2')); res.noFire = !br('sf_b2').lit;
+    near(br('sf_eternal')); res.flame = p.flameT > 10;
+    near(br('sf_b2')); res.lit = br('sf_b2').lit;
+    t.sim(33); res.out = !br('sf_b2').lit; res.flameOut = !(p.flameT > 0);
+    near(br('sf_eternal')); near(br('sf_b0')); near(br('sf_b1')); near(br('sf_b2'));
+    res.solved = g.progress.flags.has('sf_fire_done');
+    t.sim(40); res.stays = ['sf_b0', 'sf_b1', 'sf_b2'].every((id) => br(id).lit);
+    return res;
+  });
+  ok(fire.noFire && fire.flame && fire.lit && fire.out && fire.flameOut, `braseros: sin fuego no prenden, la llama eterna prende la espada y todo se apaga con el tiempo (${JSON.stringify(fire)})`);
+  ok(fire.solved && fire.stays, 'los tres braseros encendidos a la vez quedan ardiendo y abren la puerta de las runas');
+  await page.evaluate(() => { window.__t.tp(14.5, 17.4, Math.PI); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_sf_doorA')), 'la puerta de piedra se abre al acercarse');
+  await page.screenshot({ path: `${OUT}/20-shrine-runes.png` });
+  const runes = await page.evaluate(() => {
+    const g = window.__game, t = window.__t;
+    const step = (c, r) => { const [x, z] = g.zone.tileToWorld(c, r); g.player.place(x, z, Math.PI); t.sim(0.15); };
+    const tab = g.interactables.find((i) => i.kind === 'runetablet');
+    step(14, 9);
+    const wrong = tab.progress === 0 && !g.progress.flags.has('sf_runes_done');
+    step(19, 12); const first = tab.progress;
+    for (const [c, r] of [[9, 9], [9, 12], [19, 9], [14, 12]]) step(c, r);
+    return { wrong, first, solved: g.progress.flags.has('sf_runes_done') };
+  });
+  ok(runes.wrong && runes.first === 1 && runes.solved, `runas: un paso en falso las apaga y el orden de la tablilla las despierta (${JSON.stringify(runes)})`);
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(14.5, 7.6, Math.PI); window.__t.sim(2.5); window.__t.tp(14.5, 3.6, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('emblem_forest')), 'el gran cofre del santuario da el Emblema del Bosque');
+  ok(await page.evaluate(() => { const g = window.__game; const [x, z] = g.zone.tileToWorld(4, 11); return !g.zone.collision.blocked(x, z, 0.45); }), 'el muro falso del santuario lleva a la sala secreta');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(14.5, 31, 0); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'forest' && !window.__game.transitioning, 30000), 'la salida del santuario vuelve al bosque');
   await page.evaluate(() => { window.__t.tp(22.5, 23.75, Math.PI); window.__t.sim(0.2); window.__game.input.press('interact'); window.__t.sim(2); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_f_maze_gate')), 'la llave abre la puerta del laberinto');
   await page.evaluate(() => { window.__t.tp(21.5, 14.5, Math.PI); window.__t.sim(0.5); });
@@ -269,7 +351,7 @@ try {
         const [c, r] = tileNow();
         const [dc, dr] = D[m];
         const n = [c + dc, r + dr];
-        const block = g.interactables.find((i) => i.kind === 'iceblock' && i.tile[0] === n[0] && i.tile[1] === n[1]);
+        const block = g.interactables.find((i) => (i.kind === 'iceblock' || i.kind === 'stoneblock') && i.tile[0] === n[0] && i.tile[1] === n[1]);
         const ice = g.zone.isIceTile(c, r) || g.zone.isIceTile(n[0], n[1]);
         if (block) {
           g.input.down.add(KEY[m]); sim(0.5);
@@ -336,6 +418,31 @@ try {
     return b.tile[0] === 27 && b.tile[1] === 19;
   });
   ok(blockStays, 'un bloque ya colocado en su placa no se reinicia');
+
+  // --- Santuario de Cristal: barreras rojas/azules y bloques de piedra ---
+  ok(await page.evaluate(() => { const g = window.__game; const [x, z] = g.zone.tileToWorld(22.5, 14); return !g.progress.flags.has('opened_c_emblem') && g.zone.collision.blocked(x, z, 0.45); }), 'la reja de la caverna sigue cerrada sin el Emblema de Cristal');
+  await page.evaluate(() => { window.__game.mode = 'play'; window.__t.tp(35.5, 24, Math.PI); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'shrine_ice' && !window.__game.transitioning, 30000), 'la sala del este lleva al Santuario de Cristal');
+  const barr = await page.evaluate((moves) => {
+    const g = window.__game;
+    g.mode = 'play';
+    const bar = (c, r) => g.interactables.find((i) => i.kind === 'barrier' && i.tileRC[0] === c && i.tileRC[1] === r);
+    const s0 = { red: bar(6, 24).collider.enabled, blue: bar(21, 24).collider.enabled };
+    window.__t.tp(14, 30);
+    const res = window.__t.run(moves);
+    return { s0, res, state: g.switchState };
+  }, ["N", "N", "N", "N", "W", "W", "W", "W", "W", "W", "W", "W", "W", "H", "N", "E", "N", "N", "N", "N", "N", "W", "W", "H", "E", "E", "E", "E", "E", "N", "N", "N"]);
+  ok(barr.s0.red && !barr.s0.blue, 'al empezar, las barreras rojas están levantadas y las azules bajadas');
+  ok(barr.res.tile && barr.res.tile[0] === 9 && barr.res.tile[1] === 17, `golpeando los cristales se cruza el laberinto de barreras (${JSON.stringify(barr.res)})`);
+  await page.screenshot({ path: `${OUT}/21-shrine-crystal.png` });
+  const sok = await page.evaluate((moves) => { window.__t.tp(14, 14); return window.__t.run(moves); }, ["N", "N", "N", "W", "W", "W", "N", "W", "W", "W", "W", "N", "N", "W", "N", "E", "E", "E", "E", "E", "E", "E", "S", "S", "E", "E", "E", "E", "E", "S", "E", "E", "E", "E", "S", "S", "E", "S", "W", "W", "W", "W", "W", "W", "W"]);
+  ok(!sok.fail && await page.evaluate(() => ['si_plate1', 'si_plate2'].every((f) => window.__game.progress.flags.has(f))), `los dos bloques de piedra llegan a sus placas (${JSON.stringify(sok)})`);
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(14.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(14.5, 3.2, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('emblem_ice')), 'el gran cofre del santuario da el Emblema de Cristal');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(14.5, 33, 0); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'caves' && !window.__game.transitioning, 30000), 'la salida del santuario vuelve a las cuevas');
+  await page.evaluate(() => { window.__game.mode = 'play'; window.__t.tp(22.5, 16.2, Math.PI); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_emblem')), 'con el Emblema de Cristal la reja de la caverna se abre sola');
 
   // --- Golem de Hielo (2 fases) ---
   await page.evaluate(() => { window.__t.tp(22.5, 10, Math.PI); window.__t.sim(0.5); });
@@ -557,8 +664,53 @@ try {
   ok(!locked, 'la puerta del templo no se abre sin la Llave del Sol');
   await page.evaluate(() => { const g = window.__game; g.godMode = true; window.__t.tp(6.5, 12.3, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.6); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_sun')), 'el cofre de las ruinas da la Llave del Sol');
+  ok(await page.evaluate(() => {
+    const g = window.__game;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    window.__t.tp(23.5, 16.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5);
+    if (g.ui.dialog) g.ui.closeDialog();
+    g.mode = 'play';
+    return !g.progress.flags.has('opened_d_temple') && g.progress.has('key_sun');
+  }), 'la Llave del Sol sola no abre el templo (falta el Emblema del Sol)');
+
+  // --- Santuario del Sol: braseros en cadena y espejos ---
+  await page.evaluate(() => { window.__t.tp(41.5, 13, Math.PI); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'shrine_sun' && !window.__game.transitioning, 30000), 'el cañón lleva al Santuario del Sol');
+  const sun = await page.evaluate(() => {
+    const g = window.__game, p = g.player, t = window.__t;
+    g.mode = 'play'; g.godMode = true;
+    const br = (id) => g.interactables.find((i) => i.id === id);
+    const near = (b) => { p.place(b.x, b.z + 2.2, Math.PI); t.sim(0.1); g.input.press('interact'); t.sim(0.2); };
+    const res = {};
+    near(br('ss_eternal')); t.sim(13); near(br('ss_b0')); res.flameDies = !br('ss_b0').lit;
+    near(br('ss_eternal')); near(br('ss_b2')); near(br('ss_b2')); near(br('ss_b0'));
+    near(br('ss_eternal')); near(br('ss_b3')); near(br('ss_b3')); near(br('ss_b1'));
+    res.fire = g.progress.flags.has('ss_fire_done');
+    t.tp(16, 18.6); t.sim(2.5);
+    res.door = g.progress.flags.has('opened_ss_doorA');
+    const idol = g.interactables.find((i) => i.kind === 'beamsource');
+    t.sim(0.2);
+    res.beamOn = !!idol.path && idol.path.pts.length > 2;
+    res.notYet = !g.progress.flags.has('ss_beam_done');
+    const mirror = (c, r) => g.interactables.find((i) => i.kind === 'mirror' && i.tileRC[0] === c && i.tileRC[1] === r);
+    const turn = (c, r) => { const m = mirror(c, r); p.place(m.x, m.z + 2.6, Math.PI); t.sim(0.1); g.input.press('interact'); t.sim(0.4); return m.orient; };
+    const fixed0 = mirror(12, 7).orient; turn(12, 7); res.fixed = mirror(12, 7).orient === fixed0;
+    for (const [c, r] of [[5, 15], [5, 7], [12, 10], [21, 10]]) turn(c, r);
+    t.sim(0.5);
+    res.beam = g.progress.flags.has('ss_beam_done');
+    return res;
+  });
+  ok(sun.flameDies, 'el fuego de la espada se apaga si se tarda demasiado entre llamas');
+  ok(sun.fire && sun.door, `encendiendo los braseros en cadena se abre la sala de los espejos (${JSON.stringify(sun)})`);
+  ok(sun.beamOn && sun.notYet && sun.fixed, 'el ídolo dispara el rayo, pero no llega al cristal; el espejo de bronce no gira');
+  ok(sun.beam, 'girando los espejos el rayo de sol alcanza el cristal');
+  await page.screenshot({ path: `${OUT}/22-shrine-sun.png` });
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(15.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(15.5, 3.2, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('emblem_sun')), 'el gran cofre del santuario da el Emblema del Sol');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(15.5, 35, 0); window.__t.sim(0.3); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'desert' && !window.__game.transitioning, 30000), 'la salida del santuario vuelve al desierto');
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(23.5, 16.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(2.5); });
-  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_d_temple')), 'la Llave del Sol abre la puerta del Templo del Sol');
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_d_temple')), 'la Llave y el Emblema del Sol abren la puerta del Templo del Sol');
 
   // --- Rey de las Arenas (2 fases, invoca esqueletos de la arena) ---
   await page.evaluate(() => { window.__t.tp(24, 13, Math.PI); window.__t.sim(0.5); });

@@ -38,6 +38,11 @@ export const TILES = {
   'O': { ground: 'flagstone', solid: 'circle', radius: 0.95, tall: true, height: 6, prop: 'column' },
   'C': { ground: 'sand', solid: 'circle', radius: 0.6, prop: 'cactus' },
   'p': { ground: 'grass', solid: 'circle', radius: 0.55, tall: true, height: 7, prop: 'palm' },
+  // ---- Castillo y santuarios de piedra ----
+  'M': { ground: 'flagstone', solid: 'box', tall: true, height: 7.2, prop: 'castlewall' },
+  'm': { ground: 'flagstone', prop: 'castlewall', secret: true }, // muro falso: se atraviesa
+  'U': { ground: 'cobble', solid: 'circle', radius: 2.0, tall: true, height: 11, prop: 'tower' },
+  'q': { ground: 'cobble' },
 };
 
 export const DEFAULT_TILE = TILES['.'];

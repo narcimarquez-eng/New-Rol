@@ -111,6 +111,11 @@ export default {
     // --- puertas ---
     { type: 'door', id: 'c_gateA', tile: [22, 29], span: 2, requires: { item: 'key_frost' }, consume: true, style: 'ice',
       lockedText: 'Una reja de hielo macizo. Su cerradura tiene forma de copo de nieve: necesitas la Llave de escarcha.' },
+    // santuario de Cristal (prueba mágica: barreras y bloques de piedra)
+    { type: 'spawn', id: 'fromShrine', tile: [35.5, 26], facing: 0 },
+    { type: 'portal', tile: [35, 24], span: 2, to: 'shrine_ice', spawn: 'fromCaves', label: 'Santuario de Cristal' },
+    { type: 'door', id: 'c_emblem', tile: [22, 14], span: 2, requires: { item: 'emblem_ice' }, auto: true, style: 'ice',
+      lockedText: 'Una reja de hielo con el hueco de un emblema: el del Santuario de Cristal, en la sala del este.' },
     { type: 'door', id: 'c_gateB', tile: [22, 17], span: 2, requires: { flag: 'c_plate1' }, auto: true, style: 'ice',
       lockedText: 'La reja no tiene cerradura. Quizá se abra con algún mecanismo de la sala...' },
     { type: 'door', id: 'c_north', tile: [22, 1], span: 2, requires: { item: 'key_fire' }, consume: true, style: 'icewall',
