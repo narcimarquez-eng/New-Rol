@@ -7,6 +7,8 @@ import { spart, smerge, rockify, gradientMap as kitGradient, litMaterial } from 
 import { REALISTIC } from '../gfx/Style.js';
 import { fbm } from '../core/utils.js';
 import { triplanar, woodTextures, plasterTextures, roofTextures, rockTextures } from '../gfx/Materials.js';
+import { barkMat, endGrainMat } from '../gfx/Vegetation.js';
+import { flameMesh, embers } from '../gfx/Fire.js';
 
 // ---------- materiales compartidos ----------
 let gradientMap = null;
@@ -345,7 +347,101 @@ function buildHouseReal({ w = 8, d = 6, h = 3.4, wall = 0xf2e3c2, roof = 0xc0473
   return g;
 }
 
+/**
+ * Roca suelta del modo realista: esfera deformada con ruido coherente (sin
+ * facetas), base aplastada para asentarse en el suelo.
+ */
+export function boulderGeoReal(seed = 1, detail = 4) {
+  let g = new THREE.IcosahedronGeometry(1, detail);
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  g = mergeVertices(g, 1e-4);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const n = fbm(x * 1.3 + seed * 5.3 + y * 0.7, z * 1.3 - y * 0.9 + seed * 1.7, seed + 3, 4);
+    const k = 0.72 + n * 0.6;
+    let ny = y * k * 0.72;
+    if (ny < -0.15) ny = -0.15 + (ny + 0.15) * 0.25; // base plana
+    pos.setXYZ(i, x * k * (1 + (seed % 3) * 0.08), ny + 0.2, z * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+let rockPlain = null;
+const rockPlainMat = () => (rockPlain ??= triplanar({ key: 'rock-plain', set: rockTextures(), scale: 0.7, normalStrength: 1, vertexColors: false, color: 0x8f8a84 }));
+
+/** Leño con corteza y anillos en los cortes (eje X). */
+export function logReal(length = 2.2, radius = 0.35, bark = 'oak') {
+  const geo = new THREE.CylinderGeometry(radius * 0.92, radius, length, 14, 1);
+  const m = new THREE.Mesh(geo, [barkMat(bark, 1, length / 2.2), endGrainMat(), endGrainMat()]);
+  m.rotation.z = Math.PI / 2;
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/** Hoguera realista: leños en tipi, piedras alrededor, lecho de brasas, llamas y chispas. */
+export function campfireReal() {
+  const g = new THREE.Group();
+  // leños en tipi: cada uno sale hacia fuera y se inclina hacia el centro
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.3;
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, 1.2, 10), [barkMat('pine', 1, 0.55), endGrainMat(), endGrainMat()]);
+    const holder = new THREE.Group();
+    holder.rotation.y = -a;
+    log.position.set(0.3, 0.42, 0);
+    log.rotation.z = 0.62;
+    log.castShadow = true; log.receiveShadow = true;
+    holder.add(log);
+    g.add(holder);
+  }
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    const st = new THREE.Mesh(boulderGeoReal(i + 2, 2), rockPlainMat());
+    st.position.set(Math.cos(a) * 0.78, -0.05, Math.sin(a) * 0.78);
+    st.scale.setScalar(0.2 + (i % 3) * 0.04);
+    st.rotation.y = a * 3;
+    st.castShadow = true; st.receiveShadow = true;
+    g.add(st);
+  }
+  const bed = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x1c1612, roughness: 1, emissive: new THREE.Color(0xff5a10), emissiveIntensity: 0.9 }));
+  bed.position.y = 0.03;
+  g.add(bed);
+  const flame = flameMesh(0.95, 1.05);
+  flame.position.y = 0.05;
+  g.add(flame);
+  const flame2 = flameMesh(0.6, 0.75);
+  flame2.position.set(0.12, 0.05, 0.08);
+  g.add(flame2);
+  const sparks = embers(16, 0.3, 2.6);
+  sparks.position.y = 0.3;
+  g.add(sparks);
+  g.userData.realFlame = flame;
+  return g;
+}
+
 export function buildTorch(pal, { tall = 2.2 } = {}) {
+  if (REALISTIC) {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, tall, 10), barkMat('pine', 0.5, tall / 2.2));
+    pole.position.y = tall / 2;
+    const metal = new THREE.MeshStandardMaterial({ color: 0x3a3430, roughness: 0.45, metalness: 0.85 });
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.12, 0.3, 12, 1, true), metal);
+    cup.position.y = tall + 0.02;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 6, 16).rotateX(Math.PI / 2), metal);
+    ring.position.y = tall + 0.16;
+    const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.28, 10),
+      new THREE.MeshStandardMaterial({ color: 0x21160e, roughness: 1, emissive: new THREE.Color(0xff4a10), emissiveIntensity: 0.35 }));
+    cloth.position.y = tall + 0.1;
+    for (const m of [pole, cup, ring, cloth]) { m.castShadow = true; m.receiveShadow = true; g.add(m); }
+    const flame = flameMesh(0.62, 0.62);
+    flame.position.y = tall + 0.15;
+    g.add(flame);
+    g.userData.flame = flame;
+    g.userData.flameY = tall + 0.4;
+    return g;
+  }
   const g = new THREE.Group();
   const pole = new THREE.Mesh(merge([
     part(new THREE.CylinderGeometry(0.12, 0.16, tall, 6), pal.wood || 0x6b4426, { y: tall / 2 }),

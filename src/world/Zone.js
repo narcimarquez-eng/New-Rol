@@ -1,6 +1,7 @@
 // Construye una zona jugable a partir de sus datos: terreno, objetos
 // instanciados, colisiones, luces, entidades (NPCs, enemigos, cofres...).
 import * as THREE from 'three';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TILE, tileInfo } from './tiles.js';
 import { Terrain } from './Terrain.js';
 import { Collision } from './Collision.js';
@@ -12,8 +13,8 @@ import { windMat, instancedOutline, addOutline, spart, smerge, rockify } from '.
 import { REALISTIC } from '../gfx/Style.js';
 import { buildAtmosphere, buildRealWater } from '../gfx/Environment.js';
 import { buildBackdrop } from '../gfx/Backdrop.js';
-import { treeInstances, variedTrees } from '../gfx/Vegetation.js';
-import { triplanar, rockTextures, woodTextures, snowTextures } from '../gfx/Materials.js';
+import { treeInstances, variedTrees, barkMat, endGrainMat } from '../gfx/Vegetation.js';
+import { triplanar, rockTextures, woodTextures, snowTextures, iceMaterialReal } from '../gfx/Materials.js';
 import { tex } from '../gfx/Textures.js';
 
 let iceMat = null;
@@ -276,11 +277,14 @@ export class Zone {
       this.group.add(bushes);
     }
     // rocas y acantilados de roca triplanar con musgo o nieve encima
-    const rockGeo = smerge([
-      spart(rockify(new THREE.IcosahedronGeometry(1.25, 3), 0.22, 6, 1.4), 0xffffff, { y: 0.45, sy: 0.7, ao: 0.4, flat: true }),
-      spart(rockify(new THREE.IcosahedronGeometry(0.6, 2), 0.2, 7), 0xffffff, { x: 1.0, y: 0.25, z: 0.45, ao: 0.3, flat: true }),
-    ]);
-    add(rockGeo, rockMat, lists.rock);
+    // rocas sueltas: dos variantes de canto rodado (grande + pequeño al lado)
+    for (const v of [0, 1]) {
+      const geo = smerge([
+        spart(P.boulderGeoReal(3 + v * 4), 0xffffff, { sx: 1.35, sy: 1.25, sz: 1.2, ao: 0.4 }),
+        spart(P.boulderGeoReal(5 + v * 4, 3), 0xffffff, { x: 1.15, z: 0.5 - v, sx: 0.6, sy: 0.55, sz: 0.6, ao: 0.3 }),
+      ]);
+      add(geo, rockMat, lists.rock.filter((_, i) => i % 2 === v));
+    }
     // acantilados: dos variantes de bloque, giro y escala variados para que el muro no se repita
     const cliffs = lists.cliff.map((it, i) => ({ ...it, ry: it.ry + (hash2(i, 3, 11) - 0.5) * 0.5,
       sx: 1.05 + hash2(i, 4, 11) * 0.2, sz: 1.05 + hash2(i, 5, 11) * 0.2, sy: (it.sy ?? 1) * (0.9 + hash2(i, 6, 11) * 0.35) }));
@@ -297,7 +301,26 @@ export class Zone {
     // cristales e hielo
     add(P.crystalGeo(pal), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.08, metalness: 0.1, emissive: new THREE.Color(pal.crystalGlow ?? 0x2a6f8f), transparent: true, opacity: 0.9 }), lists.crystal);
     add(P.icePillarGeo(pal), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0.05, transparent: true, opacity: 0.85 }), lists.icepillar);
-    if (lists.iceSheet.length) this.group.add(P.instanced(new THREE.PlaneGeometry(TILE, TILE).rotateX(-Math.PI / 2), iceMaterial(), lists.iceSheet, { castShadow: false }));
+    // hielo: una sola superficie continua que sigue el terreno (sin escalones entre casillas)
+    if (lists.iceSheet.length) {
+      const geos = lists.iceSheet.map((it) => {
+        const g = new THREE.PlaneGeometry(TILE, TILE, 2, 2).rotateX(-Math.PI / 2);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const wx = it.x + p.getX(i), wz = it.z + p.getZ(i);
+          p.setXYZ(i, wx, this.height(wx, wz) + 0.05, wz);
+        }
+        g.deleteAttribute('uv'); // el material usa coordenadas de mundo
+        g.deleteAttribute('normal');
+        return g;
+      });
+      const geo = mergeVertices(mergeGeometries(geos), 1e-3);
+      geo.computeVertexNormals();
+      const ice = new THREE.Mesh(geo, iceMaterialReal());
+      ice.receiveShadow = true;
+      ice.name = 'ice';
+      this.group.add(ice);
+    }
     if (pal.grassDensity !== 0) this.group.add(buildGrass(this, Math.round((pal.grassDensity ?? 48) * (this.quality.high ? 1.6 : 0.5))));
   }
 
@@ -338,8 +361,15 @@ export class Zone {
             P.part(new THREE.BoxGeometry(1.1, 0.35, 0.5), 0x444444, { y: 0.75 }),
           ]), P.toonMat()); break;
           case 'campfire': obj = this.buildCampfire(); break;
-          case 'log': obj = new THREE.Mesh(P.part(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 7), pal.trunk, { rz: Math.PI / 2, y: 0.35 }), P.toonMat()); break;
-          case 'stump': obj = new THREE.Mesh(P.part(new THREE.CylinderGeometry(0.55, 0.65, 0.7, 8), pal.trunk, { y: 0.35 }), P.toonMat()); break;
+          case 'log':
+            if (REALISTIC) { obj = new THREE.Group(); const l = P.logReal(2.2, 0.35); l.position.y = 0.33; obj.add(l); break; }
+            obj = new THREE.Mesh(P.part(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 7), pal.trunk, { rz: Math.PI / 2, y: 0.35 }), P.toonMat()); break;
+          case 'stump':
+            if (REALISTIC) {
+              obj = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.68, 0.7, 16), [barkMat('oak', 1.2, 0.35), endGrainMat(), endGrainMat()]);
+              obj.geometry.translate(0, 0.35, 0); break;
+            }
+            obj = new THREE.Mesh(P.part(new THREE.CylinderGeometry(0.55, 0.65, 0.7, 8), pal.trunk, { y: 0.35 }), P.toonMat()); break;
           default: continue;
         }
         obj.position.set(x, this.height(x, z), z);
@@ -347,7 +377,8 @@ export class Zone {
         const fire = this.torches.find((t) => t.obj === obj);
         if (fire) { fire.x = x; fire.z = z; fire.y = obj.position.y + 0.9; }
         const meshes = [];
-        obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material.type !== 'MeshBasicMaterial') meshes.push(o); } });
+        // (las llamas de sombreador no proyectan sombra)
+        obj.traverse((o) => { if (o.isMesh && !o.material.isShaderMaterial) { o.castShadow = true; o.receiveShadow = true; if (o.material.type !== 'MeshBasicMaterial') meshes.push(o); } });
         meshes.forEach((m) => addOutline(m, 0.04));
         this.group.add(obj);
         if (e.radius) this.collision.addCircle(x, z, e.radius, { tall: false });
@@ -373,6 +404,13 @@ export class Zone {
   }
 
   buildCampfire() {
+    if (REALISTIC) {
+      const g = P.campfireReal();
+      const flame = g.userData.realFlame;
+      this.torches.push({ obj: g, x: 0, z: 0, y: 0, phase: 1, lateBind: true, flame });
+      this.updaters.push((t) => { flame.scale.set(1 + Math.sin(t * 13) * 0.08, 1 + Math.sin(t * 9) * 0.15 + Math.sin(t * 23) * 0.05, 1); });
+      return g;
+    }
     const g = new THREE.Group();
     const logs = new THREE.Mesh(P.merge([
       P.part(new THREE.CylinderGeometry(0.12, 0.12, 1.2, 5), 0x5a3a22, { y: 0.15, rz: Math.PI / 2 }),

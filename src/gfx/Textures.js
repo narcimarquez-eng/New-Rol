@@ -196,17 +196,88 @@ export function roofTextures() {
 }
 
 /** Roca con estratos y grietas (para acantilados, rocas y piedra). */
+/**
+ * Voronoi repetible: para cada píxel devuelve la celda más cercana, el vector
+ * hasta su punto (en píxeles) y F2-F1 (distancia al borde, en píxeles).
+ */
+function voronoiTile(size, cells, r, { warpX = null, warpY = null, aniso = 1 } = {}) {
+  const pts = [];
+  for (let i = 0; i < cells * cells; i++) pts.push([r(), r()]);
+  const cs = size / cells;
+  const id = new Int32Array(size * size), dxA = new Float32Array(size * size), dyA = new Float32Array(size * size), edge = new Float32Array(size * size);
+  for (let y0 = 0; y0 < size; y0++) for (let x0 = 0; x0 < size; x0++) {
+    const i0 = y0 * size + x0;
+    // deformación del dominio: bordes curvos en vez de polígonos rectos
+    const x = x0 + (warpX ? warpX[i0] : 0), y = y0 + (warpY ? warpY[i0] : 0);
+    const cx = Math.floor(x / cs), cy = Math.floor(y / cs);
+    let d1 = 1e9, d2 = 1e9, best = 0, bx = 0, by = 0;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const gx = cx + ox, gy = cy + oy;
+      const k = ((gy + cells) % cells) * cells + ((gx + cells) % cells);
+      const px = (gx + pts[k][0]) * cs, py = (gy + pts[k][1]) * cs;
+      const d = Math.hypot(x - px, (y - py) * aniso);
+      if (d < d1) { d2 = d1; d1 = d; best = k; bx = x - px; by = y - py; } else if (d < d2) d2 = d;
+    }
+    id[i0] = best; dxA[i0] = bx; dyA[i0] = by; edge[i0] = d2 - d1;
+  }
+  return { id, dx: dxA, dy: dyA, edge };
+}
+
+/** Roca: lascas facetadas (cada celda con su inclinación), fracturas, estratos y grano. */
 export function rockTextures() {
   return cached('rock', () => {
-    const size = 256, r = rng(20);
-    const noise = fbmTile(size, r, [[4, 0.45], [8, 0.25], [16, 0.15], [48, 0.15]]);
-    const cracks = fbmTile(size, rng(21), [[6, 0.6], [12, 0.4]]);
+    const size = 512;
+    const wx = fbmTile(size, rng(34), [[4, 0.6], [8, 0.4]]), wy = fbmTile(size, rng(35), [[4, 0.6], [8, 0.4]]);
+    for (let i = 0; i < wx.length; i++) { wx[i] = (wx[i] - 0.5) * 70; wy[i] = (wy[i] - 0.5) * 40; }
+    // celdas aplastadas en vertical: lajas horizontales como en un acantilado real
+    const big = voronoiTile(size, 6, rng(30), { warpX: wx, warpY: wy, aniso: 2.2 });
+    const small = voronoiTile(size, 14, rng(31), { warpX: wx, warpY: wy, aniso: 1.6 });
+    const rb = rng(32), rs = rng(33);
+    const planeB = Array.from({ length: 36 }, () => [(rb() - 0.5) * 0.5, (rb() - 0.5) * 0.9, rb(), rb()]);
+    const planeS = Array.from({ length: 196 }, () => [(rs() - 0.5) * 0.25, (rs() - 0.5) * 0.4, rs(), rs()]);
+    const macro = fbmTile(size, rng(20), [[3, 0.4], [6, 0.35], [12, 0.25]]);
+    const warp = fbmTile(size, rng(22), [[4, 0.6], [8, 0.4]]);
+    const grain = fbmTile(size, rng(26), [[128, 0.5], [256, 0.5]]);
+    const tint = fbmTile(size, rng(23), [[2, 0.6], [5, 0.4]]);
+    const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     return build(size, (x, y, i) => {
-      const strata = Math.sin((y / size) * 18 + noise[i] * 5) * 0.5 + 0.5;
-      const crack = Math.abs(cracks[i] - 0.5) < 0.02 ? 0.55 : 1;
-      const v = (0.45 + noise[i] * 0.45 + strata * 0.12) * crack;
-      return { r: clamp255(v * 170), g: clamp255(v * 165), b: clamp255(v * 158), h: noise[i] + strata * 0.2 - (crack < 1 ? 0.3 : 0), rough: 0.88 };
-    }, { normalStrength: 3 });
+      const pb = planeB[big.id[i]], ps = planeS[small.id[i]];
+      const facet = big.dx[i] * pb[0] + big.dy[i] * pb[1] + pb[2] * 12 + small.dx[i] * ps[0] + small.dy[i] * ps[1] + ps[2] * 2;
+      // solo algunos bordes son grietas abiertas (según la celda vecina, aquí aproximado por la propia)
+      const openB = pb[3] > 0.35 ? 1 : 0.25, openS = ps[3] > 0.7 ? 1 : 0;
+      const crackB = (1 - sm(0, 3, big.edge[i])) * openB, crackS = (1 - sm(0, 1.6, small.edge[i])) * openS;
+      const strata = Math.sin((y / size) * Math.PI * 2 * 5 + (warp[i] - 0.5) * 6);
+      const h = facet - crackB * 6 - crackS * 2 + (macro[i] - 0.5) * 30 + strata * 2 + (grain[i] - 0.5) * 1.4;
+      const crack = Math.max(crackB, crackS * 0.5);
+      const v = Math.max(0.12, 0.56 + (pb[2] - 0.5) * 0.07 + (ps[2] - 0.5) * 0.03 + (macro[i] - 0.5) * 0.25
+        + strata * 0.02 + (grain[i] - 0.5) * 0.12 - crack * 0.22);
+      const w = (tint[i] - 0.5) * 0.12; // vetas cálidas/frías suaves
+      return { r: clamp255(v * 228 * (1 + w)), g: clamp255(v * 226), b: clamp255(v * 224 * (1 - w)), h, rough: 0.8 + crack * 0.15 };
+    }, { normalStrength: 0.5 });
+  });
+}
+
+/** Hielo: escarcha nubosa, burbujas y grietas blancas finas (algunas, no todas las celdas). */
+export function iceTextures() {
+  return cached('ice', () => {
+    const size = 512;
+    const wx = fbmTile(size, rng(40), [[3, 0.6], [6, 0.4]]), wy = fbmTile(size, rng(41), [[3, 0.6], [6, 0.4]]);
+    for (let i = 0; i < wx.length; i++) { wx[i] = (wx[i] - 0.5) * 90; wy[i] = (wy[i] - 0.5) * 90; }
+    const big = voronoiTile(size, 4, rng(42), { warpX: wx, warpY: wy });
+    const small = voronoiTile(size, 11, rng(43), { warpX: wx, warpY: wy });
+    const rb = rng(44), open = Array.from({ length: 121 }, () => rb());
+    const frost = fbmTile(size, rng(45), [[3, 0.4], [7, 0.3], [16, 0.2], [40, 0.1]]);
+    const bubbles = fbmTile(size, rng(46), [[96, 1]]);
+    const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    return build(size, (x, y, i) => {
+      const cB = (1 - sm(0, 1.6, big.edge[i])) * (open[big.id[i] % 121] > 0.25 ? 1 : 0);
+      const cS = (1 - sm(0, 1.0, small.edge[i])) * (open[small.id[i]] > 0.72 ? 0.7 : 0);
+      const crack = Math.max(cB, cS);
+      const f = sm(0.45, 0.8, frost[i]);
+      const bub = bubbles[i] > 0.83 ? (bubbles[i] - 0.83) * 4 : 0;
+      const v = 0.6 + f * 0.32 + crack * 0.38 + bub * 0.25;
+      return { r: clamp255(v * 228), g: clamp255(v * 242), b: clamp255(v * 255), h: f * 1.5 - crack * 3 + bub, rough: 0.05 + f * 0.3 + crack * 0.35 };
+    }, { normalStrength: 0.6 });
   });
 }
 

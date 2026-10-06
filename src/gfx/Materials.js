@@ -5,7 +5,7 @@
 //  - terrainMaterial(): mezcla 4 capas (césped, tierra, piedra, nieve) según
 //    pesos por vértice, con detalle de normales y rugosidad por capa.
 import * as THREE from 'three';
-import { tex, rockTextures, cobbleTextures, snowTextures } from './Textures.js';
+import { tex, rockTextures, cobbleTextures, snowTextures, iceTextures } from './Textures.js';
 
 const TRI_VERT_PARS = 'varying vec3 vTriPos;\nvarying vec3 vTriN;\n';
 const TRI_VERT = `
@@ -215,5 +215,31 @@ export function terrainMaterial() {
   return m;
 }
 
+let iceReal = null;
+/** Hielo del lago: barniz brillante (clearcoat) que refleja el cielo, escarcha y grietas, algo translúcido. */
+export function iceMaterialReal() {
+  if (iceReal) return iceReal;
+  const set = iceTextures();
+  iceReal = new THREE.MeshPhysicalMaterial({
+    map: set.map, normalMap: set.normalMap, roughnessMap: set.roughnessMap, normalScale: new THREE.Vector2(0.5, 0.5),
+    color: 0x8fb8d2, roughness: 1, metalness: 0, clearcoat: 0.8, clearcoatRoughness: 0.14,
+    transparent: true, opacity: 0.8, envMapIntensity: 1.4,
+  });
+  // coordenadas de textura en espacio de mundo: sin costuras entre casillas
+  iceReal.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+      {
+        mat4 iceM = modelMatrix;
+        #ifdef USE_INSTANCING
+          iceM = modelMatrix * instanceMatrix;
+        #endif
+        vec2 iceUv = (iceM * vec4(position, 1.0)).xz * 0.09;
+        vMapUv = iceUv; vNormalMapUv = iceUv; vRoughnessMapUv = iceUv;
+      }`);
+  };
+  iceReal.customProgramCacheKey = () => 'ice-world-uv';
+  return iceReal;
+}
+
 /** Madera procedural triplanar (vallas, puentes, carteles...). */
-export { woodTextures, plasterTextures, roofTextures, rockTextures, snowTextures, cobbleTextures } from './Textures.js';
+export { woodTextures, plasterTextures, roofTextures, rockTextures, snowTextures, cobbleTextures, iceTextures } from './Textures.js';

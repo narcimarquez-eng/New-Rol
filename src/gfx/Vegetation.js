@@ -216,6 +216,44 @@ function leafMaterials(kind) {
   return out;
 }
 
+/** Corteza PBR para troncos sueltos (leños, tocones, postes); repetición en u (vuelta) y v (largo). */
+export function barkMat(bark = 'oak', rx = 1, ry = 1, tint = 0xffffff) {
+  const key = `barkmat|${bark}|${rx}|${ry}|${tint}`;
+  if (matCache.has(key)) return matCache.get(key);
+  const rep = (name, opts) => texRepeat(`bark/${bark}_${name}_1k.jpg`, rx, ry, opts);
+  const m = new THREE.MeshStandardMaterial({ map: rep('color'), normalMap: rep('normal', { srgb: false }), roughnessMap: rep('roughness', { srgb: false }), color: tint });
+  matCache.set(key, m);
+  return m;
+}
+
+let endGrain = null;
+/** Corte de un tronco: anillos de crecimiento (para las tapas de leños y tocones). */
+export function endGrainMat() {
+  if (endGrain) return endGrain;
+  const S = 256, cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const c = cv.getContext('2d');
+  const img = c.createImageData(S, S);
+  const r = rngFn(77);
+  const wob = Array.from({ length: 16 }, () => r() * 6.283);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = x - S / 2, dy = y - S / 2;
+    const a = Math.atan2(dy, dx), d = Math.hypot(dx, dy) / (S / 2);
+    const ring = Math.sin((d * 22 + Math.sin(a * 3 + wob[0]) * 0.25 + Math.sin(a * 7 + wob[1]) * 0.1) * Math.PI * 2) * 0.5 + 0.5;
+    const bark = d > 0.9 ? 1 : 0;
+    const crack = Math.abs(Math.sin(a * 2.5 + wob[2])) < 0.02 && d > 0.15 ? 1 : 0;
+    let v = 0.62 + ring * 0.12 - d * 0.1 - crack * 0.25 + (r() - 0.5) * 0.05;
+    if (bark) v = 0.25 + r() * 0.06;
+    const i = (y * S + x) * 4;
+    img.data[i] = Math.min(255, v * 235); img.data[i + 1] = Math.min(255, v * 190); img.data[i + 2] = Math.min(255, v * 140); img.data[i + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  endGrain = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 });
+  return endGrain;
+}
+
 /**
  * Crea las mallas instanciadas (ramas + hojas) para una lista de posiciones.
  * items: [{x,y,z,ry,s}] · devuelve un THREE.Group

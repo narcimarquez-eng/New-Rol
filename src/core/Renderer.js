@@ -1,5 +1,5 @@
 // Renderizador WebGL + cadena de post-procesado:
-//   escena -> oclusión ambiental (GTAO, calidad alta) -> bloom -> tone mapping/sRGB
+//   escena -> oclusión ambiental (GTAO, calidad alta) -> límite de brillo -> bloom -> tone mapping/sRGB
 //   -> etalonaje (saturación, contraste, tono cálido) + viñeta.
 // La calidad se adapta sola si los FPS caen.
 import * as THREE from 'three';
@@ -77,6 +77,16 @@ export class Renderer {
         this.ao = null;
       }
     }
+    // límite de brillo antes del bloom: un reflejo del sol en el hielo (miles de
+    // veces más brillante que el resto) no debe convertirse en un velo enorme
+    this.clamp = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, maxValue: { value: 6 } },
+      vertexShader: GradeShader.vertexShader,
+      fragmentShader: /* glsl */`
+        uniform sampler2D tDiffuse; uniform float maxValue; varying vec2 vUv;
+        void main() { vec4 c = texture2D(tDiffuse, vUv); gl_FragColor = vec4(min(c.rgb, vec3(maxValue)), c.a); }`,
+    });
+    this.composer.addPass(this.clamp);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.55, 0.9);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());

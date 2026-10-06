@@ -80,6 +80,9 @@ paisajes de Three.js:
   que proyectan sombra y balanceo con el viento;
 - terreno con 4 capas texturizadas (césped, tierra, adoquines, nieve) y materiales
   triplanares para rocas, acantilados, madera, yeso y tejas;
+- roca procedural con lajas facetadas, fracturas y estratos (sin texturas externas);
+- hielo del lago con barniz que refleja el cielo, escarcha, burbujas y grietas;
+- fuego de sombreador (llama animada con ruido y chispas que suben) en antorchas y hogueras;
 - agua con reflejos planos y oleaje; post-procesado con GTAO, bloom y etalonaje.
 
 **Ilustrado** (`?toon`), el estilo de dibujo animado de las primeras fases: personajes

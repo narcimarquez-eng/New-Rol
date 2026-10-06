@@ -22,7 +22,7 @@ export default {
   ambient: 'snow',
   palette: {
     ground: { grass: 0xdfeaf3, forest: 0xd3e2ee, path: 0xb9c6d4, stone: 0x9aa8b8, sand: 0xd8e2ea, water: 0x6fa8c8, snow: 0xeef5fb, ice: 0xa9dcf2 },
-    groundReal: { grass: 0xdde6ee, forest: 0xd0dbe6, path: 0x9aa4ae, stone: 0x8c96a2, sand: 0xc8d0d8, water: 0x5a6a78, snow: 0xeef3f8, ice: 0xbfdcea },
+    groundReal: { grass: 0xdde6ee, forest: 0xd0dbe6, path: 0x9aa4ae, stone: 0x8c96a2, sand: 0xc8d0d8, water: 0x5a6a78, snow: 0xeef3f8, ice: 0x6f98b4 },
     trunk: 0x5a4636, leaf: 0x6f9a8a, leaf2: 0x8fb8a8, pine: 0x2f5d50, pine2: 0x3d7060, pineSnow: 0xffffff,
     rock: 0x6f7f95, rock2: 0x8a9bb0, bush: 0x6f9a8a, hedge: 0x5a6b80, hedge2: 0x7a8ba0, cliffTop: 0xf4f9fd, cliffIce: 0xbfefff,
     wood: 0x6b4426, wood2: 0x8b5a2b, grassTuft: 0xcfe0ec,
