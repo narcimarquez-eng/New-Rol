@@ -19,6 +19,9 @@ mkdirSync(OUT, { recursive: true });
 const executablePath = process.env.CHROMIUM_PATH || (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
 
 let failures = 0;
+// capturas de ayuda (no son comprobaciones): si el renderizado por software va lento, se omiten
+let page;
+const shot = async (opts) => { try { await page.screenshot({ ...opts, timeout: 60000 }); } catch (e) { console.log(`  (captura omitida: ${String(e.message).split('\n')[0]})`); } };
 const waitTrue = async (page, fn, ms = 20000) => {
   try { await page.waitForFunction(fn, null, { timeout: ms, polling: 200 }); return true; } catch { return false; }
 };
@@ -39,7 +42,7 @@ const browser = await chromium.launch({
   executablePath,
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--ignore-certificate-errors'],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -53,13 +56,13 @@ try {
   ok(loadMs < 5000, `el juego carga y dibuja su primer fotograma en ${loadMs} ms (< 5000)`);
   console.log(`  (tiempo total incluyendo el arranque del navegador: ${Date.now() - t0} ms)`);
   await page.waitForTimeout(500);
-  await page.screenshot({ path: `${OUT}/01-title.png` });
+  await shot({ path: `${OUT}/01-title.png` });
 
   // ---------- nueva partida ----------
   await page.click('#btn-new');
   await page.waitForTimeout(800);
   ok(await page.evaluate(() => window.__game.mode === 'play'), 'empieza la partida (modo play)');
-  await page.screenshot({ path: `${OUT}/02-village-start.png` });
+  await shot({ path: `${OUT}/02-village-start.png` });
 
   // helpers dentro de la página
   await page.evaluate(() => {
@@ -128,7 +131,7 @@ try {
   ok(/Anciano/.test(prompt), `aparece el aviso de hablar: "${prompt}"`);
   await page.evaluate(() => { window.__game.input.press('interact'); window.__t.sim(0.2); });
   ok(await page.evaluate(() => window.__game.mode === 'dialog'), 'E abre el diálogo');
-  await page.screenshot({ path: `${OUT}/03-dialog.png` });
+  await shot({ path: `${OUT}/03-dialog.png` });
   for (let i = 0; i < 12 && await page.evaluate(() => window.__game.mode === 'dialog'); i++) {
     await page.evaluate(() => { window.__game.ui.advanceDialog(); window.__game.ui.advanceDialog(); window.__t.sim(0.05); });
   }
@@ -139,7 +142,7 @@ try {
     await page.evaluate(([c, r]) => { window.__t.tp(c, r + 0.6, Math.PI); window.__game.input.press('attack'); window.__t.sim(0.6); }, [c, r]);
   }
   ok(await page.evaluate(() => window.__game.progress.flags.has('dummies_done')), 'golpear los 3 muñecos completa el entrenamiento');
-  await page.screenshot({ path: `${OUT}/04-training.png` });
+  await shot({ path: `${OUT}/04-training.png` });
   await page.evaluate(() => { window.__t.tp(7, 8.55, Math.PI); window.__t.sim(0.2); window.__game.input.press('interact'); window.__t.sim(0.1); });
   for (let i = 0; i < 12 && await page.evaluate(() => window.__game.mode === 'dialog'); i++) {
     await page.evaluate(() => { window.__game.ui.advanceDialog(); window.__game.ui.advanceDialog(); window.__t.sim(0.05); });
@@ -221,7 +224,7 @@ try {
   });
   const after = await page.evaluate(() => window.__game.progress.totalKills);
   ok(after > before, `la espada derrota enemigos (${after - before} derrotados)`);
-  await page.screenshot({ path: `${OUT}/05-meadow-combat.png` });
+  await shot({ path: `${OUT}/05-meadow-combat.png` });
 
   // ---------- recibir daño y bloquear ----------
   const dmg = await page.evaluate(() => {
@@ -238,12 +241,12 @@ try {
   // ---------- puerta norte y paso al bosque ----------
   await page.evaluate(() => { window.__t.tp(17.5, 4); window.__t.sim(2.5); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_v_gate')), 'la puerta norte se abre tras el tutorial');
-  await page.screenshot({ path: `${OUT}/06-north-gate.png` });
+  await shot({ path: `${OUT}/06-north-gate.png` });
   await page.evaluate(() => { window.__t.tp(17.5, 1); window.__game.input.down.add('up'); window.__t.sim(1.2); window.__game.input.down.delete('up'); });
   await page.waitForTimeout(700);
   await page.evaluate(() => window.__t.sim(0.5));
   ok(await page.evaluate(() => window.__game.zone.id === 'forest'), 'el portal lleva al Bosque Encantado');
-  await page.screenshot({ path: `${OUT}/07-forest-entry.png` });
+  await shot({ path: `${OUT}/07-forest-entry.png` });
 
   const forest = await collisionReport();
   ok(forest.inside === 0, `Bosque: ${forest.tests} pasos sin atravesar paredes (${forest.inside} fallos)`);
@@ -253,7 +256,7 @@ try {
   // ---------- recorrido de la historia del bosque ----------
   await page.evaluate(() => { window.__game.godMode = true; window.__t.tp(3, 25.5, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(0.5); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_maze')), 'el cofre del claro oeste da la Llave del Laberinto');
-  await page.screenshot({ path: `${OUT}/08-forest-chest.png` });
+  await shot({ path: `${OUT}/08-forest-chest.png` });
 
   // ---------- Santuario de las Luciérnagas: braseros con tiempo y runas ----------
   ok(await page.evaluate(() => {
@@ -284,7 +287,7 @@ try {
   ok(fire.solved && fire.stays, 'los tres braseros encendidos a la vez quedan ardiendo y abren la puerta de las runas');
   await page.evaluate(() => { window.__t.tp(14.5, 17.4, Math.PI); window.__t.sim(2.5); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_sf_doorA')), 'la puerta de piedra se abre al acercarse');
-  await page.screenshot({ path: `${OUT}/20-shrine-runes.png` });
+  await shot({ path: `${OUT}/20-shrine-runes.png` });
   const runes = await page.evaluate(() => {
     const g = window.__game, t = window.__t;
     const step = (c, r) => { const [x, z] = g.zone.tileToWorld(c, r); g.player.place(x, z, Math.PI); t.sim(0.15); };
@@ -304,7 +307,7 @@ try {
   await page.evaluate(() => { window.__t.tp(22.5, 23.75, Math.PI); window.__t.sim(0.2); window.__game.input.press('interact'); window.__t.sim(2); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_f_maze_gate')), 'la llave abre la puerta del laberinto');
   await page.evaluate(() => { window.__t.tp(21.5, 14.5, Math.PI); window.__t.sim(0.5); });
-  await page.screenshot({ path: `${OUT}/09-boss-arena.png` });
+  await shot({ path: `${OUT}/09-boss-arena.png` });
   const bossDead = await page.evaluate(() => {
     const g = window.__game;
     for (let i = 0; i < 60 * 40; i++) {
@@ -320,7 +323,7 @@ try {
   ok(bossDead, 'el Rey Trasgo (2 fases) puede ser derrotado');
   ok(await page.evaluate(() => window.__game.progress.flags.has('boss_forest')), 'derrotar al jefe activa su bandera');
   await page.evaluate(() => window.__t.sim(1));
-  await page.screenshot({ path: `${OUT}/10-boss-defeated.png` });
+  await shot({ path: `${OUT}/10-boss-defeated.png` });
   await page.evaluate(() => { window.__t.tp(21.5, 9.62, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(0.5); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_forest')), 'el gran cofre da la Llave del Bosque');
   await page.evaluate(() => { window.__game.mode = 'play'; window.__game.ui.show('itemget', false); window.__t.tp(22.5, 1.78, Math.PI); window.__t.sim(0.3); window.__game.input.press('interact'); window.__t.sim(2.2); });
@@ -330,7 +333,7 @@ try {
   await page.evaluate(() => window.__t.sim(0.3));
   ok(await page.evaluate(() => window.__game.zone.id === 'caves'), 'el portal norte del bosque lleva a las Cuevas Heladas');
   ok(await page.evaluate(() => window.__game.progress.flags.has('entered_caves')), 'se registra la entrada en las cuevas');
-  await page.screenshot({ path: `${OUT}/11-caves-entry.png` });
+  await shot({ path: `${OUT}/11-caves-entry.png` });
 
   // =================== FASE 2: CUEVAS HELADAS ===================
   const caves = await collisionReport();
@@ -384,7 +387,7 @@ try {
   // --- puzle 1: lago helado (solución del solucionador: N W N W W W W S) ---
   const lakeEnd = await page.evaluate(() => { window.__t.tp(12, 37, Math.PI); return window.__t.exec(['N', 'W', 'N', 'W', 'W', 'W', 'W', 'S']); });
   ok(Math.abs(lakeEnd[0] - 7) + Math.abs(lakeEnd[1] - 35) === 1, `el deslizamiento sobre hielo sigue la solución del lago (acaba en ${lakeEnd})`);
-  await page.screenshot({ path: `${OUT}/12-ice-lake.png` });
+  await shot({ path: `${OUT}/12-ice-lake.png` });
   await page.evaluate(() => { const g = window.__game; g.input.press('interact'); window.__t.sim(0.4); });
   ok(await waitTrue(page, () => window.__game.progress.has('key_frost')), 'el cofre de la isla da la Llave de escarcha');
 
@@ -404,7 +407,7 @@ try {
   // --- puzle 2: bloque hasta la placa (29 pasos del solucionador) ---
   const blockSol = ['W', 'W', 'W', 'W', 'W', 'W', 'N', 'E', 'N', 'N', 'W', 'W', 'W', 'W', 'W', 'W', 'N', 'W', 'S', 'W', 'S', 'S', 'E', 'E', 'E', 'S', 'E', 'N', 'N'];
   await page.evaluate((sol) => { window.__t.tp(22, 27, Math.PI); window.__t.exec(sol); }, blockSol);
-  await page.screenshot({ path: `${OUT}/13-block-puzzle.png` });
+  await shot({ path: `${OUT}/13-block-puzzle.png` });
   ok(await page.evaluate(() => window.__game.progress.flags.has('c_plate1')), 'empujar el bloque de hielo hasta la placa resuelve el puzle');
   await page.evaluate(() => { window.__t.tp(22.5, 18.6, Math.PI); window.__t.sim(2.5); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_gateB')), 'la placa abre la reja del norte');
@@ -434,10 +437,10 @@ try {
   }, ["N", "N", "N", "N", "W", "W", "W", "W", "W", "W", "W", "W", "W", "H", "N", "E", "N", "N", "N", "N", "N", "W", "W", "H", "E", "E", "E", "E", "E", "N", "N", "N"]);
   ok(barr.s0.red && !barr.s0.blue, 'al empezar, las barreras rojas están levantadas y las azules bajadas');
   ok(barr.res.tile && barr.res.tile[0] === 9 && barr.res.tile[1] === 17, `golpeando los cristales se cruza el laberinto de barreras (${JSON.stringify(barr.res)})`);
-  await page.screenshot({ path: `${OUT}/21-shrine-crystal.png` });
+  await shot({ path: `${OUT}/21-shrine-crystal.png` });
   const sok = await page.evaluate((moves) => { window.__t.tp(14, 14); return window.__t.run(moves); }, ["N", "N", "N", "W", "W", "W", "N", "W", "W", "W", "W", "N", "N", "W", "N", "E", "E", "E", "E", "E", "E", "E", "S", "S", "E", "E", "E", "E", "E", "S", "E", "E", "E", "E", "S", "S", "E", "S", "W", "W", "W", "W", "W", "W", "W"]);
   ok(!sok.fail && await page.evaluate(() => ['si_plate1', 'si_plate2'].every((f) => window.__game.progress.flags.has(f))), `los dos bloques de piedra llegan a sus placas (${JSON.stringify(sok)})`);
-  await page.evaluate(() => { const g = window.__game; window.__t.tp(14.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(14.5, 3.2, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(14.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(14.5, 2.9, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
   ok(await waitTrue(page, () => window.__game.progress.has('emblem_ice')), 'el gran cofre del santuario da el Emblema de Cristal');
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(14.5, 33, 0); window.__t.sim(0.3); });
   ok(await waitTrue(page, () => window.__game.zone.id === 'caves' && !window.__game.transitioning, 30000), 'la salida del santuario vuelve a las cuevas');
@@ -446,7 +449,7 @@ try {
 
   // --- Golem de Hielo (2 fases) ---
   await page.evaluate(() => { window.__t.tp(22.5, 10, Math.PI); window.__t.sim(0.5); });
-  await page.screenshot({ path: `${OUT}/14-golem.png` });
+  await shot({ path: `${OUT}/14-golem.png` });
   const golemDead = await page.evaluate(() => {
     const g = window.__game;
     g.godMode = true;
@@ -489,7 +492,7 @@ try {
   ok(await waitTrue(page, () => window.__game.zone.id === 'desert' && !window.__game.transitioning, 30000), 'el paso del norte lleva al Desierto Perdido');
   ok(await page.evaluate(() => window.__game.progress.flags.has('entered_desert')), 'se registra la llegada al desierto');
   await page.evaluate(() => window.__t.sim(0.5));
-  await page.screenshot({ path: `${OUT}/16-desert.png` });
+  await shot({ path: `${OUT}/16-desert.png` });
 
   // helpers del desierto
   await page.evaluate(() => {
@@ -704,8 +707,8 @@ try {
   ok(sun.fire && sun.door, `encendiendo los braseros en cadena se abre la sala de los espejos (${JSON.stringify(sun)})`);
   ok(sun.beamOn && sun.notYet && sun.fixed, 'el ídolo dispara el rayo, pero no llega al cristal; el espejo de bronce no gira');
   ok(sun.beam, 'girando los espejos el rayo de sol alcanza el cristal');
-  await page.screenshot({ path: `${OUT}/22-shrine-sun.png` });
-  await page.evaluate(() => { const g = window.__game; window.__t.tp(15.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(15.5, 3.2, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  await shot({ path: `${OUT}/22-shrine-sun.png` });
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(15.5, 6.6, Math.PI); window.__t.sim(2.5); window.__t.tp(15.5, 2.9, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
   ok(await waitTrue(page, () => window.__game.progress.has('emblem_sun')), 'el gran cofre del santuario da el Emblema del Sol');
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(15.5, 35, 0); window.__t.sim(0.3); });
   ok(await waitTrue(page, () => window.__game.zone.id === 'desert' && !window.__game.transitioning, 30000), 'la salida del santuario vuelve al desierto');
@@ -714,7 +717,7 @@ try {
 
   // --- Rey de las Arenas (2 fases, invoca esqueletos de la arena) ---
   await page.evaluate(() => { window.__t.tp(24, 13, Math.PI); window.__t.sim(0.5); });
-  await page.screenshot({ path: `${OUT}/17-sand-king.png` });
+  await shot({ path: `${OUT}/17-sand-king.png` });
   const king = await page.evaluate(() => {
     const g = window.__game;
     g.godMode = true;
@@ -782,13 +785,167 @@ try {
   ok(quests3.secretPassable && quests3.amulet === 'done', `misión "El amuleto de la familia" con el pasadizo secreto (${quests3.secretPassable}, ${quests3.amulet})`);
   ok(quests3.shards === 'done', `misión "Fragmentos de sol" (${quests3.shards})`);
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(23.5, 12, Math.PI); window.__t.sim(1); });
-  await page.screenshot({ path: `${OUT}/18-party.png` });
+  await shot({ path: `${OUT}/18-party.png` });
 
-  // --- salida norte: fin de la Fase 3 ---
+  // --- salida norte: el templo lleva al Castillo Final (fin de la Fase 3) ---
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(23.5, 0.2, Math.PI); window.__t.sim(0.4); });
-  ok(await page.evaluate(() => window.__game.progress.flags.has('phase3_complete')), 'la salida norte del templo completa la Fase 3');
-  ok(await page.evaluate(() => /Fase 3/.test(document.querySelector('#ending h1').textContent)), 'se muestra la pantalla de fin de la Fase 3');
-  await page.screenshot({ path: `${OUT}/19-ending.png` });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'castle' && !window.__game.transitioning, 30000), 'la salida norte del templo lleva al Castillo Final');
+  ok(await page.evaluate(() => window.__game.progress.flags.has('phase3_complete')), 'cruzar al castillo completa la Fase 3');
+
+  // ======================= FASE 4: CASTILLO FINAL =======================
+  const C = {"barriers": {"start": [8, 41], "moves": ["N", "N", "E", "E", "E", "E", "E", "E", "H", "W", "W", "W", "W", "W", "W", "W", "W", "W", "N", "N", "N", "N", "W", "W", "H", "E", "E", "E", "E", "N", "N", "N", "N", "N", "W", "W", "W"]}, "blocks": {"start": [4, 28], "moves": ["N", "N", "E", "N", "N", "W", "N", "E", "E", "E", "E", "S", "S", "S", "S", "E", "E", "E", "E", "N", "W", "N", "E", "S", "E", "N", "N", "S", "W", "W", "N", "N", "E", "E"]}, "mirrors": [[15, 12], [8, 12], [8, 9]], "runes": [[46, 25], [46, 22], [51, 25], [41, 22], [51, 22], [41, 25]], "crypt": {"start": [46, 15], "moves": ["N", "N", "N", "E", "N", "N", "N", "E", "N", "W", "W", "W", "W", "W"]}};
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.sim(0.5); });
+  await shot({ path: `${OUT}/23-castle.png` });
+  const aldric = await page.evaluate(() => { window.__t.talk('aldric'); window.__t.sim(0.3); return window.__game.companions.map((c) => c.id); });
+  ok(aldric.includes('aldric'), `Sir Aldric se une al grupo ante el puente (${aldric})`);
+  const castleCol = await collisionReport();
+  ok(castleCol.inside === 0, `Castillo: ${castleCol.tests} pasos sin atravesar paredes (${castleCol.inside} fallos)`);
+  const camK = await cameraReport();
+  ok(camK.bad === 0, `Castillo: cámara correcta en ${camK.n} posiciones (${camK.bad} fallos)`);
+  ok(await page.evaluate(() => {
+    const g = window.__game;
+    g.mode = 'play';
+    window.__t.tp(27.5, 17.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5);
+    const locked = !!g.ui.dialog;
+    if (g.ui.dialog) g.ui.closeDialog();
+    g.mode = 'play';
+    return locked && !g.progress.flags.has('opened_k_gate');
+  }), 'la Gran Puerta no se abre sin los tres sellos');
+
+  // --- Ala del Cristal: barreras y bloques -> Sello del Cristal ---
+  const kw = await page.evaluate((C) => {
+    const g = window.__game, t = window.__t;
+    t.tp(...C.barriers.start);
+    const bar = t.run(C.barriers.moves);
+    t.tp(...C.blocks.start);
+    const blk = t.run(C.blocks.moves);
+    return { bar, blk, plates: ['kw_plate1', 'kw_plate2'].every((f) => g.progress.flags.has(f)) };
+  }, C);
+  ok(kw.bar.tile && kw.bar.tile[0] === 4 && kw.bar.tile[1] === 30, `Ala del Cristal: los cristales abren paso entre las barreras (${JSON.stringify(kw.bar)})`);
+  ok(!kw.blk.fail && kw.plates, `Ala del Cristal: los dos bloques llegan a sus placas (${JSON.stringify(kw.blk)})`);
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(8.5, 22.6, Math.PI); window.__t.sim(2.5); window.__t.tp(8.5, 19.4, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('seal_crystal')), 'el cofre del ala oeste da el Sello del Cristal');
+
+  // --- Torre de la Luz: espejos -> Sello de la Luz ---
+  const kl = await page.evaluate((turns) => {
+    const g = window.__game, p = g.player, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    t.tp(8.5, 18.4, Math.PI); t.sim(2.5);
+    const door = g.progress.flags.has('opened_kw_lib');
+    const before = g.progress.flags.has('kl_beam_done');
+    const mirror = (c, r) => g.interactables.find((i) => i.kind === 'mirror' && i.tileRC[0] === c && i.tileRC[1] === r);
+    for (const [c, r] of turns) { const m = mirror(c, r); p.place(m.x, m.z + 2.6, Math.PI); t.sim(0.1); g.input.press('interact'); t.sim(0.4); }
+    t.sim(0.5);
+    return { door, before, beam: g.progress.flags.has('kl_beam_done') };
+  }, C.mirrors);
+  ok(kl.door && !kl.before && kl.beam, `Torre de la Luz: con el Sello del Cristal se entra y los espejos llevan el rayo al cristal (${JSON.stringify(kl)})`);
+  await shot({ path: `${OUT}/24-castle-library.png` });
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(8.5, 4.6, Math.PI); window.__t.sim(2.5); window.__t.tp(8.5, 2.2, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('seal_light')), 'el nicho de la biblioteca da el Sello de la Luz');
+
+  // --- Ala de la Llama: braseros con tiempo y runas -> Sello de la Llama ---
+  const ke = await page.evaluate((runes) => {
+    const g = window.__game, p = g.player, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false); g.godMode = true;
+    const br = (id) => g.interactables.find((i) => i.id === id);
+    const near = (b) => { p.place(b.x, b.z + 2.2, Math.PI); t.sim(0.1); g.input.press('interact'); t.sim(0.2); };
+    near(br('ke_eternal'));
+    for (const id of ['ke_b2', 'ke_b0', 'ke_b3', 'ke_b1']) { near(br(id)); near(br('ke_eternal')); }
+    const fire = g.progress.flags.has('ke_fire_done');
+    t.tp(46.5, 30.4, Math.PI); t.sim(2.5);
+    const doorA = g.progress.flags.has('opened_ke_doorA');
+    const step = (c, r) => { const [x, z] = g.zone.tileToWorld(c, r); p.place(x, z, Math.PI); t.sim(0.15); };
+    for (const [c, r] of runes) step(c, r);
+    return { fire, doorA, runes: g.progress.flags.has('ke_runes_done') };
+  }, C.runes);
+  ok(ke.fire && ke.doorA, `Ala de la Llama: los cuatro braseros a tiempo abren la sala de las runas (${JSON.stringify(ke)})`);
+  ok(ke.runes, 'Ala de la Llama: las seis runas en orden abren la sala del sello');
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(46.5, 21.4, Math.PI); window.__t.sim(2.5); window.__t.tp(46.5, 19.3, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('seal_flame')), 'el cofre del ala este da el Sello de la Llama');
+
+  // --- Cripta: bloque y placa -> tomo; sala secreta ---
+  const kc = await page.evaluate((C) => {
+    const g = window.__game, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    t.tp(46.5, 18.4, Math.PI); t.sim(2.5);
+    const door = g.progress.flags.has('opened_ke_crypt');
+    t.tp(...C.crypt.start);
+    const blk = t.run(C.crypt.moves);
+    const [sx, sz] = g.zone.tileToWorld(51, 5);
+    return { door, blk, plate: g.progress.flags.has('kc_plate'), secret: !g.zone.collision.blocked(sx, sz, 0.45) };
+  }, C);
+  ok(kc.door && kc.plate && !kc.blk.fail, `Cripta: con el Sello de la Llama se entra y el bloque abre la cámara del tomo (${JSON.stringify(kc)})`);
+  ok(kc.secret, 'Cripta: un muro falso lleva a la sala secreta');
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(42, 7.2, Math.PI); window.__t.sim(2.5); window.__t.tp(42, 4, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('lost_tome')), 'la cámara de la cripta guarda el Tomo de los sellos');
+
+  // --- misiones secundarias del castillo ---
+  const quests4 = await page.evaluate(() => {
+    const g = window.__game, pr = g.progress, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    const res = {};
+    // Isolda: el tomo
+    t.tp(12.5, 16.6, Math.PI); t.talk('isolda'); t.talk('isolda');
+    res.tome = pr.questState('q_tome');
+    // Bartolo: 6 caballeros oscuros
+    t.tp(48.5, 46.5, Math.PI); t.talk('bartolo');
+    for (let k = 0; k < 6; k++) { const e = t.spawnNear('darkKnight', 30, 0); e.die(); }
+    t.talk('bartolo');
+    res.knights = pr.questState('q_knights');
+    // Cedric: 3 estandartes -> se une al grupo
+    t.tp(24.5, 62, 0); t.talk('cedric');
+    for (const [c, r] of [[3, 48], [53, 51], [52, 8]]) { t.tp(c, r, 0); t.sim(0.4); }
+    t.tp(24.5, 62, 0); t.talk('cedric');
+    res.banners = pr.questState('q_banners');
+    return res;
+  });
+  ok(quests4.tome === 'done', `misión "El tomo de los sellos" (${quests4.tome})`);
+  ok(quests4.knights === 'done', `misión "Caballeros caídos" (${quests4.knights})`);
+  ok(quests4.banners === 'done', `misión "Los estandartes del reino" (${quests4.banners})`);
+  ok(await waitTrue(page, () => window.__game.companions.some((c) => c.id === 'cedric')), 'Sir Cedric se une al grupo con los estandartes');
+
+  // --- la Gran Puerta y Malakar ---
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(27.5, 17.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_k_gate')), 'los tres sellos abren la Gran Puerta');
+  await page.evaluate(() => { window.__t.tp(27.5, 15, Math.PI); window.__t.sim(0.5); });
+  await shot({ path: `${OUT}/25-malakar.png` });
+  const fight = await page.evaluate(() => {
+    const g = window.__game, p = g.player;
+    g.godMode = true;
+    const res = { shield: false, blocked: false, stun: false, phase3: false, pylonsSeen: 0 };
+    for (let i = 0; i < 60 * 180; i++) {
+      const b = g.enemies.find((e) => e.def.boss);
+      if (!b) break;
+      if (b.shielded) {
+        res.shield = true;
+        if (!res.blocked) res.blocked = b.hurt(1, p.x, p.z) === 'blocked';
+      }
+      if (b.state === 'stun') res.stun = true;
+      if (b.phase === 3) res.phase3 = true;
+      res.pylonsSeen = Math.max(res.pylonsSeen, g.interactables.filter((it) => it.kind === 'pylon' && !it.removed).length);
+      for (const m of g.enemies) if (!m.def.boss && m.alive && m.state !== 'awaken' && Math.random() < 0.02) m.die();
+      let tx = b.x, tz = b.z, rad = b.radius;
+      const py = b.shielded && g.interactables.find((it) => it.kind === 'pylon' && !it.removed);
+      if (py) { tx = py.x; tz = py.z; rad = 0.9; }
+      const d = Math.hypot(tx - p.x, tz - p.z);
+      if (d > rad + 2.4) { const a = Math.atan2(p.x - tx, p.z - tz); p.pos.x = tx + Math.sin(a) * (rad + 1.9); p.pos.z = tz + Math.cos(a) * (rad + 1.9); g.zone.collision.resolve(p.pos, 0.5); }
+      p.facing = Math.atan2(tx - p.x, tz - p.z);
+      if (i % 10 === 0) g.input.press('attack');
+      g.noRender = true; g.step(1 / 60); g.noRender = false; g.input.endFrame();
+    }
+    const b = g.enemies.find((e) => e.def.boss);
+    return { ...res, dead: !b, hp: b?.hp, st: b?.state, phase: b?.phase };
+  });
+  ok(fight.shield && fight.blocked && fight.pylonsSeen === 4, `Malakar se protege con un escudo que para los golpes y alimentan 4 cristales oscuros (${JSON.stringify(fight)})`);
+  ok(fight.stun, 'al romper los cristales, el escudo cae y Malakar queda aturdido');
+  ok(fight.phase3, 'Malakar entra en su fase de furia');
+  ok(fight.dead, 'Malakar puede ser derrotado');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.sim(1); window.__t.tp(27.5, 2.6, Math.PI); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_k_balcony')), 'tras la victoria se abre la puerta del balcón');
+  await page.evaluate(() => { const g = window.__game; window.__t.tp(27.5, 0.2, Math.PI); window.__t.sim(0.4); });
+  ok(await waitTrue(page, () => window.__game.progress.flags.has('game_complete')), 'salir al balcón completa el juego');
+  ok(await page.evaluate(() => /salvado el reino/.test(document.querySelector('#ending h1').textContent)), 'se muestra la pantalla final del juego');
+  await shot({ path: `${OUT}/26-ending.png` });
   await page.evaluate(() => { document.getElementById('btn-keep').click(); });
 
   // ---------- guardado ----------

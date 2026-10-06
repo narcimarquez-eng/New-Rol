@@ -28,6 +28,14 @@ export const STORY = [
   { until: { flag: 'opened_d_temple' }, text: 'Abre la puerta del Templo del Sol con la Llave y el Emblema del Sol.' },
   { until: { flag: 'boss_desert' }, text: 'Derrota al guardián del Templo del Sol.' },
   { until: { any: [{ has: 'key_castle' }, { flag: 'phase3_complete' }] }, text: 'Abre el gran cofre del templo.' },
-  { until: { flag: 'phase3_complete' }, text: 'Cruza la salida norte del templo hacia el Castillo Final.' },
-  { until: null, text: '¡Fase 3 completada! El Castillo Final llegará pronto...' },
+  { until: { any: [{ flag: 'phase3_complete' }, { flag: 'entered_castle' }] }, text: 'Cruza la salida norte del templo hacia el Castillo Final.' },
+  // ---- Fase 4: Castillo Final ----
+  { until: { flag: 'met_aldric_castle' }, text: 'Habla con Sir Aldric ante el puente del castillo.' },
+  { until: { any: [{ has: 'seal_crystal' }, { flag: 'opened_k_gate' }] }, text: 'Consigue el Sello del Cristal en el ala oeste (entra por el jardín).' },
+  { until: { any: [{ has: 'seal_light' }, { flag: 'opened_k_gate' }] }, text: 'Guía el rayo de sol en la Torre de la Luz (biblioteca, al norte del ala oeste) y consigue el Sello de la Luz.' },
+  { until: { any: [{ has: 'seal_flame' }, { flag: 'opened_k_gate' }] }, text: 'Consigue el Sello de la Llama en el ala este (entra por los cuarteles).' },
+  { until: { flag: 'opened_k_gate' }, text: 'Abre la Gran Puerta de la antesala con los tres sellos.' },
+  { until: { flag: 'boss_castle' }, text: 'Derrota a Malakar, el Rey Sombrío, en la sala del trono.' },
+  { until: { flag: 'game_complete' }, text: 'Sal al balcón del trono: el reino te espera.' },
+  { until: null, text: '¡Has salvado el reino! Gracias por jugar.' },
 ];

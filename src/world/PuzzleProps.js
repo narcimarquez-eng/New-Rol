@@ -103,7 +103,7 @@ export function buildMirror({ fixed = false } = {}) {
     spart(new THREE.BoxGeometry(2.5, 2.1, 0.08), 0x3a2a1e, { y: 1.15, z: -0.08, ao: 0 }),
   ]), metalMat()));
   const pane = new THREE.Mesh(new THREE.PlaneGeometry(2.44, 2.08),
-    REALISTIC ? new THREE.MeshStandardMaterial({ color: 0xe8eef4, metalness: 1, roughness: 0.04, envMapIntensity: 1.4 })
+    REALISTIC ? new THREE.MeshStandardMaterial({ color: 0xf2f6fa, metalness: 0.9, roughness: 0.1, envMapIntensity: 1.6, emissive: new THREE.Color(0x3a4450) })
       : litMaterial({ color: 0xcfeaff, emissive: new THREE.Color(0x24506a) }));
   pane.position.set(0, 1.15, 0.03);
   // destello que aparece cuando el rayo da en el espejo

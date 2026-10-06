@@ -487,6 +487,77 @@ export class RuneTablet extends Base {
   }
 }
 
+// ------------------------------------------------------------------ cristales de sombra
+/** Cristal oscuro que alimenta el escudo del jefe final: un rayo lo une a él; se rompe a espadazos. */
+export class ShadowPylon extends Base {
+  constructor(game, data) {
+    super(game, data);
+    this.kind = 'pylon';
+    this.boss = data.boss;
+    this.hp = data.hp ?? 3;
+    this.mesh = PP.buildSwitchCrystal();
+    const orb = this.mesh.userData.orb;
+    orb.material = orb.material.clone();
+    orb.material.color.set(0x7a30e0);
+    orb.material.emissive?.set(0x5a20c0);
+    orb.scale.setScalar(1.25);
+    this.root.add(this.mesh);
+    this.collider = game.zone.collision.addCircle(this.x, this.z, 0.9, { tall: false });
+    this.link = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(0xa060ff).multiplyScalar(2), transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+    game.scene.add(this.link);
+    this.light = { obj: { userData: {} }, x: this.x, z: this.z, y: this.y + 2.4, phase: Math.random() * 6, crystal: true, color: 0x9a50ff };
+    game.zone.torches.push(this.light);
+    game.dummies.push(this);
+    this.mapColor = '#b070ff';
+    this.cool = 0;
+    game.particles.burst(this.x, this.y + 2.4, this.z, { count: 30, color: 0x9a50ff, speed: 5, up: 4, life: 0.8 });
+  }
+  hit() {
+    if (this.removed || this.cool > 0) return;
+    this.cool = 0.25;
+    const g = this.game;
+    this.hp--;
+    g.audio.sfx('block');
+    g.particles.hit(this.x, this.y + 2.4, this.z, 0xc090ff);
+    if (this.hp > 0) return;
+    this.removed = true;
+    g.audio.sfx('kill');
+    g.shake(0.25);
+    g.particles.burst(this.x, this.y + 2.4, this.z, { count: 40, color: 0x9a50ff, speed: 8, up: 5, life: 0.9 });
+    const left = (this.boss.pylons || []).filter((p) => !p.removed);
+    if (this.boss.alive && this.boss.shielded && !left.length) this.boss.breakShield();
+    else if (left.length) g.ui.toast(`Quedan ${left.length} cristales oscuros.`);
+  }
+  update(dt) {
+    this.cool -= dt;
+    const orb = this.mesh.userData.orb;
+    orb.rotation.y += dt * 2;
+    orb.position.y = 2.35 + Math.sin(this.game.time * 3 + this.x) * 0.12;
+    // rayo de energía hacia el jefe
+    const b = this.boss;
+    const on = b.alive && b.shielded;
+    this.link.visible = on;
+    if (on) {
+      const a = new THREE.Vector3(this.x, this.y + 2.4, this.z);
+      const t = new THREE.Vector3(b.pos.x, b.pos.y + b.radius * 1.6, b.pos.z);
+      const len = a.distanceTo(t);
+      this.link.position.copy(a).add(t).multiplyScalar(0.5);
+      this.link.scale.set(1, len, 1);
+      this.link.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), t.sub(a).normalize());
+      this.link.material.opacity = 0.5 + Math.sin(this.game.time * 10) * 0.2;
+    }
+  }
+  dispose() {
+    super.dispose();
+    this.game.scene.remove(this.link);
+    this.link.geometry.dispose();
+    this.game.zone.collision.remove(this.collider);
+    const i = this.game.dummies.indexOf(this); if (i >= 0) this.game.dummies.splice(i, 1);
+    const j = this.game.zone.torches.indexOf(this.light); if (j >= 0) this.game.zone.torches.splice(j, 1);
+  }
+}
+
 /** Crea la entidad de puzle para un tipo de dato de zona (o null si no es de puzle). */
 export function createPuzzleEntity(game, e) {
   switch (e.type) {

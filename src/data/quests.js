@@ -166,4 +166,39 @@ export const QUESTS = {
       done: ['Que la luz del sol te guíe.'],
     },
   },
+
+  // ---------------------------------------------------------------- Castillo Final
+  q_banners: {
+    name: 'Los estandartes del reino', zone: 'castle', giver: 'cedric', type: 'collect', item: 'royal_banner', count: 3, consume: true,
+    desc: 'Sir Cedric quiere recuperar los 3 estandartes reales que Malakar arrancó: en el jardín, en los cuarteles y en la cripta.',
+    reward: [['heart_container', 1]], recruit: 'cedric',
+    lines: {
+      offer: ['¡Has llegado! Sabía que vendrías.', 'Malakar arrancó los estandartes del reino y los tiró por el castillo como trapos viejos.', 'Hay uno en el jardín, otro en los cuarteles y otro en la cripta. Tráemelos y lucharé a tu lado.'],
+      active: ['El jardín está al oeste del patio; los cuarteles, al este. La cripta... detrás del Ala de la Llama.'],
+      complete: ['¡Los tres estandartes! El reino aún vive.', 'Mi espada es tuya. ¡Vamos a por Malakar!'],
+      done: ['¡Por el reino!'],
+    },
+  },
+  q_knights: {
+    name: 'Caballeros caídos', zone: 'castle', giver: 'bartolo', type: 'kill', enemy: 'darkKnight', count: 6,
+    desc: 'Bartolo, el cocinero del castillo, no puede salir de los cuarteles: derrota a 6 caballeros oscuros.',
+    reward: [['potion', 2], ['coin', 80]],
+    lines: {
+      offer: ['¡Shh! ¿Eres de los buenos? ¡Uf!', 'Soy Bartolo, el cocinero. Los caballeros de la guardia... Malakar los convirtió en sombras.', 'Si derrotas a seis, podré volver a mi cocina. Te daré lo mejor de la despensa.'],
+      active: ['Patrullan el patio, los cuarteles y la antesala. Llevan escudo: ¡rompe su guardia con el último golpe del combo!'],
+      complete: ['¡Seis! Por fin podré encender los fogones.', 'Toma: pociones de la despensa y unas monedas que guardaba en el bote de la sal.'],
+      done: ['¡Esta noche hay estofado para todos!'],
+    },
+  },
+  q_tome: {
+    name: 'El tomo de los sellos', zone: 'castle', giver: 'isolda', type: 'collect', item: 'lost_tome', count: 1, consume: true,
+    desc: 'Isolda, la bibliotecaria, busca el Tomo de los sellos, escondido en una cámara de la cripta.',
+    reward: [['stamina_up', 1], ['coin', 60]],
+    lines: {
+      offer: ['Bienvenido a la Torre de la Luz... o lo que queda de ella.', 'El Tomo de los sellos explica cómo se forjaron los sellos de la Gran Puerta. Lo escondieron en la cripta.', 'La cámara del tomo se abre con una losa: empuja el bloque de piedra hasta su placa.'],
+      active: ['La cripta está al noreste, tras el Ala de la Llama. Cuidado con los muertos que duermen allí.'],
+      complete: ['¡El Tomo de los sellos! Gracias, de verdad.', 'Toma este elixir: te dará aliento para el último combate.'],
+      done: ['Que la luz te acompañe ante el trono.'],
+    },
+  },
 };

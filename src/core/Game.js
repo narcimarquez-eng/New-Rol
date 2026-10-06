@@ -14,7 +14,7 @@ import { COMPANIONS } from '../data/companions.js';
 import { charactersReady } from '../gfx/Characters.js';
 import { Enemy } from '../entities/Enemy.js';
 import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetStone } from '../entities/Interactables.js';
-import { createPuzzleEntity } from '../entities/Puzzles.js';
+import { createPuzzleEntity, ShadowPylon } from '../entities/Puzzles.js';
 import { Particles } from '../systems/Particles.js';
 import { Projectiles } from '../systems/Projectiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
@@ -362,6 +362,11 @@ export class Game {
   }
 
   /** Un compañero se une al grupo (acción de diálogo { recruit }). */
+  /** Cristales oscuros del escudo del jefe final (posiciones en los datos del enemigo). */
+  spawnPylons(boss) {
+    return (boss.spawn.pylons || []).map((tile) => this.addInteractable(new ShadowPylon(this, { tile, boss })));
+  }
+
   recruit(id, npc) {
     const def = COMPANIONS[id];
     if (!def || this.progress.flags.has(`companion_${id}`)) return;
@@ -392,6 +397,8 @@ export class Game {
   }
 
   usePortal(data) {
+    // cruzar un portal puede marcar un hito (p. ej. fin de una fase)
+    if (data.flag && ZONES[data.to] && !this.progress.flags.has(data.flag)) this.progress.flags.add(data.flag);
     if (!ZONES[data.to]) {
       // zona aún no construida: fin de la fase actual
       if (data.flag && !this.progress.flags.has(data.flag)) {

@@ -8,9 +8,9 @@ y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 
 **▶ Jugar:** https://narcimarquez-eng.github.io/new-rol/
 
-> Fases completadas: **1** (motor, Aldea Inicial, Bosque Encantado), **2** (Cuevas Heladas)
-> y **3** (Desierto Perdido, nuevo héroe animado y compañeros de aventura).
-> Próxima fase: Castillo Final.
+> **Juego completo**: Fase **1** (motor, Aldea Inicial, Bosque Encantado), **2** (Cuevas Heladas),
+> **3** (Desierto Perdido, héroe animado y compañeros) y **4** (pruebas mágicas, tres
+> santuarios y el **Castillo Final** con el jefe Malakar).
 > Estilo visual realista (PBR) por defecto; añade `?toon` a la URL para el estilo ilustrado.
 
 ## Controles
@@ -54,6 +54,23 @@ y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 - Las **tormentas de arena** llegan cada poco: casi no se ve, el viento frena si caminas
   contra él… y los enemigos tampoco te ven bien ni aciertan sus disparos.
 
+### Pruebas mágicas
+
+- **Braseros y fuego**: acerca la espada a una llama (E) y arderá unos segundos. Con ella
+  enciendes braseros apagados (E o un espadazo). Los braseros encendidos también prenden la
+  espada, así que puedes encadenar llamas. Algunos grupos se **apagan solos** al poco
+  tiempo: hay que encenderlos todos a la vez.
+- **Rayo de sol**: un ídolo dispara un rayo de luz que viaja en línea recta. Los
+  **espejos** giran con E y lo desvían 90°; los muros, columnas, bloques y puertas lo
+  cortan. Cuando llega al **cristal solar**, algo se abre. Los espejos de bronce oscuro
+  no se mueven.
+- **Cristales de cambio**: golpéalos (o pulsa E) y las **barreras rojas y azules** se
+  alternan. Nunca están levantadas las dos a la vez.
+- **Runas**: la tablilla muestra una secuencia de símbolos (al leerla, las losas destellan
+  en orden). Písalas en ese orden; un paso en falso las apaga todas.
+- **Bloques de piedra**: como los de hielo, se empujan caminando contra ellos y se quedan
+  fijos sobre su placa. La piedra rúnica los devuelve a su sitio.
+
 ### Contenido de la Fase 1
 
 - **Aldea Inicial**: tutorial con el Anciano Bruno, tienda de pociones, 3 misiones
@@ -87,6 +104,38 @@ y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 - 4 misiones: Huesos en la arena (Borg se une al grupo), Plaga de escorpiones,
   El amuleto de la familia y Fragmentos de sol. Personajes: Kael, Borg, el mercader
   Zahir y los caballeros Sir Aldric y Sir Cedric.
+
+### Contenido de la Fase 4
+
+- **Tres santuarios** (zonas nuevas con dos pruebas mágicas cada una). Su emblema es
+  necesario para llegar al jefe de su zona:
+  - **Santuario de las Luciérnagas** (claro del este del bosque): braseros con tiempo y
+    runas. Abre la verja del laberinto junto a la Llave del Laberinto.
+  - **Santuario de Cristal** (sala del este de las cuevas): laberinto de barreras rojas y
+    azules y dos bloques de piedra. Abre la reja de la caverna del Golem.
+  - **Santuario del Sol** (cañón del desierto): braseros en cadena y espejos que guían el
+    rayo de sol. Abre el Templo del Sol junto a la Llave del Sol.
+- **Castillo Final**: campamento ante el foso, puente, patio de armas, jardín y cuarteles.
+  - **Ala del Cristal**: barreras rojas y azules y dos bloques → **Sello del Cristal**.
+  - **Torre de la Luz** (biblioteca): espejos y rayo → **Sello de la Luz**.
+  - **Ala de la Llama**: cuatro braseros con tiempo y seis runas → **Sello de la Llama**.
+  - **Cripta**: esqueletos enterrados, un bloque que abre la cámara del tomo y una sala secreta.
+  - La **Gran Puerta** se abre con los tres sellos. En la sala del trono espera
+    **Malakar, el Rey Sombrío**, el jefe final:
+    1. espada, pisotón y hechizos;
+    2. se envuelve en un **escudo de sombras** que para todos los golpes: hay que romper los
+       cuatro **cristales oscuros** de la sala y, al caer el escudo, queda aturdido;
+    3. furia final, con cargas, ráfagas de cinco orbes y refuerzos.
+
+    Al vencerle, el balcón del trono da paso al final del juego.
+  - Enemigos: caballero oscuro (escudo), hechicero oscuro, esqueleto pícaro, bruto acorazado
+    y los esqueletos de la cripta.
+  - **Compañeros**: Sir Aldric se une ante el puente; Sir Cedric, al recuperar los
+    estandartes del reino. El grupo completo son cinco héroes.
+  - 3 misiones: Los estandartes del reino, Caballeros caídos y El tomo de los sellos.
+- Los mapas de santuarios y castillo los generan `tools/gen_shrines.py` y
+  `tools/gen_castle.py`, que **comprueban con solucionadores** que cada prueba tiene solución
+  (y que no viene resuelta) y sacan la secuencia de movimientos que usan los tests.
 
 ### Gráficos
 
@@ -133,8 +182,10 @@ librería como Mixamo); el sistema de animación ya está preparado para cambiar
 npm install
 npm run dev        # servidor de desarrollo (http://localhost:5173)
 npm run build      # compila a dist/
-npm test           # test end-to-end en Chromium headless (Playwright): Fases 1, 2 y 3 completas (estilo ?toon)
-node tests/real-smoke.mjs    # prueba de humo del estilo realista: las 4 zonas, sin errores
+npm test           # test end-to-end en Chromium headless (Playwright): el juego completo (estilo ?toon)
+node tests/real-smoke.mjs    # prueba de humo del estilo realista: todas las zonas, sin errores
+python3 tools/gen_shrines.py  # genera y verifica los santuarios (acertijos con solución)
+python3 tools/gen_castle.py   # genera y verifica el Castillo Final
 node tools/build-characters.mjs   # regenera los personajes KayKit optimizados (descarga los packs)
 python3 tools/gen_desert.py --check   # comprueba que todo el desierto es alcanzable
 node tests/data.mjs  # validación de los datos de las zonas

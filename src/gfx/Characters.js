@@ -71,6 +71,7 @@ export const HAND = { r: 'handslotr', l: 'handslotl' };
  *   borrow: { r: ['knight', '1H_Sword'], l: [...] }  armas de otro modelo (se enlazan a este esqueleto),
  *   props: { r: 'sk_blade', l: 'sk_shield_small_a' }  armas sueltas en la mano,
  *   recolor: { 'x,y': color } celdas de la paleta,
+ *   tint: color que multiplica todos los materiales (versiones oscuras),
  * }
  * Devuelve { scene, meshes, materials, hands } (la escena ya clonada, sin escalar).
  */
@@ -117,6 +118,7 @@ export function instantiate(def) {
       const m = o.material.clone();
       if (def.recolor && m.map) m.map = recolorTexture(m.map, def.recolor);
       m.roughness = Math.max(m.roughness, 0.6); m.metalness = Math.min(m.metalness, 0.2);
+      if (def.tint != null) m.color.multiply(new THREE.Color(def.tint)); // p. ej. caballeros oscuros
       swap.set(o.material, m);
     }
     o.material = swap.get(o.material);

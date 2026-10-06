@@ -1,7 +1,9 @@
 // Enemigos con IA de estados: patrulla -> persecución (si te ven) -> anticipación
 // visible (destello amarillo) -> ataque -> recuperación.
 // El tipo de ataque sale de los datos (def.ai): 'melee', 'hop', 'swoop', 'bite',
-// 'lunge', 'ranged', 'boss' (Rey Trasgo) y 'golem' (Golem de Hielo).
+// 'lunge', 'ranged', 'boss' (Rey Trasgo) y 'golem' (Golem de Hielo); 'brute' (golpe y
+// pisotón) y 'darklord' (jefe final: tres fases, teletransporte, hechizos y escudo de
+// sombras que solo cae al destruir los cristales oscuros de la sala).
 import * as THREE from 'three';
 import { ENEMIES } from '../data/enemies.js';
 import { buildEnemyModel } from './EnemyModels.js';
@@ -34,6 +36,7 @@ export class Enemy {
     this.vel = new THREE.Vector2();
     this.lastSeen = -99;
     this.phase = 1;
+    this.shielded = false;
 
     const [x, z] = game.zone.tileToWorld(...spawn.tile);
     this.home = { x, z };
@@ -81,6 +84,11 @@ export class Enemy {
     if (!this.alive) return 'ignored';
     if (this.dormant) { this.wake(); return 'ignored'; }
     if (this.state === 'awaken') return 'ignored';
+    // escudo de sombras del jefe final: nada lo atraviesa mientras queden cristales
+    if (this.shielded) {
+      this.game.particles.hit(this.pos.x, this.pos.y + 2.5, this.pos.z, 0xb070ff);
+      return 'blocked';
+    }
     // escudo: para los golpes de frente salvo el remate del combo (rompe la guardia)
     if (this.def.shield && !heavy && !['windup', 'attack', 'hurt'].includes(this.state)) {
       const toSrc = Math.atan2(fromX - this.pos.x, fromZ - this.pos.z);
@@ -97,8 +105,11 @@ export class Enemy {
     this.flash();
     this.lastSeen = this.game.time;
     if (this.hp <= 0) { this.die(); return 'hit'; }
-    if (!this.def.boss || this.state !== 'attack') { this.state = 'hurt'; this.stateT = 0; }
-    if (this.def.boss && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2();
+    if ((!this.def.boss || this.state !== 'attack') && this.state !== 'stun') { this.state = 'hurt'; this.stateT = 0; }
+    if (this.ai === 'darklord') {
+      if (this.phase === 1 && this.hp <= this.maxHp * 0.66) this.enterShield();
+      else if (this.phase === 2 && !this.shielded && this.hp <= this.maxHp * 0.33) this.enterPhase3();
+    } else if (this.def.boss && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2();
     return 'hit';
   }
 
@@ -122,9 +133,87 @@ export class Enemy {
     }
   }
 
+  // ---------------------------------------------------------------- jefe final
+  /** Fase 2: se envuelve en un escudo de sombras alimentado por cristales oscuros. */
+  enterShield() {
+    const g = this.game;
+    this.phase = 2;
+    this.shielded = true;
+    this.state = 'recover'; this.stateT = 0;
+    g.audio.sfx('boss');
+    g.shake(0.6);
+    g.ui.toast(this.def.shieldText || '¡Un escudo de sombras lo protege! Rompe los cristales oscuros de la sala.');
+    this.teleport(g.player, true);
+    this.pylons = g.spawnPylons(this);
+    if (!this.shieldMesh) {
+      this.shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(this.radius * 2.2, 24, 16),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8a40ff).multiplyScalar(1.4), transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+      this.shieldMesh.position.y = this.radius * 1.6;
+      this.root.add(this.shieldMesh);
+    }
+    this.shieldMesh.visible = true;
+  }
+
+  /** Los cristales han caído: el escudo se rompe y queda aturdido unos segundos. */
+  breakShield() {
+    const g = this.game;
+    this.shielded = false;
+    if (this.shieldMesh) this.shieldMesh.visible = false;
+    this.state = 'stun'; this.stateT = 0;
+    g.audio.sfx('secret');
+    g.shake(0.5);
+    g.ui.toast(this.def.breakText || '¡El escudo se rompe! ¡Ahora, ataca!');
+    g.particles.burst(this.pos.x, this.pos.y + 3, this.pos.z, { count: 60, color: 0xb070ff, speed: 10, up: 5, life: 1 });
+  }
+
+  /** Fase 3: furia final, más rápido y con refuerzos. */
+  enterPhase3() {
+    const g = this.game;
+    this.phase = 3;
+    this.speed *= 1.3;
+    this.state = 'recover'; this.stateT = 0;
+    g.audio.sfx('boss');
+    g.shake(0.7);
+    g.ui.toast(this.def.phase3Text || '¡Se enfurece! Su espada arde con fuego oscuro.');
+    if (this.kk) for (const m of this.kk.materials) m.color.multiply(new THREE.Color(1.5, 0.75, 0.85));
+    g.particles.burst(this.pos.x, this.pos.y + 3, this.pos.z, { count: 50, color: 0xff3a6a, speed: 9, up: 5, life: 1 });
+    for (const [kind, off] of (this.def.phase3Summon || []).map((k, i) => [k, [[-5, 0], [5, 0], [0, 5], [0, -5]][i % 4]])) {
+      const c = (this.pos.x + off[0] + g.zone.W * TILE / 2) / TILE - 0.5;
+      const r = (this.pos.z + off[1] + g.zone.H * TILE / 2) / TILE - 0.5;
+      if (!g.zone.collision.blocked(this.pos.x + off[0], this.pos.z + off[1], 0.7)) g.spawnEnemy({ kind, tile: [c, r], summoned: true });
+    }
+  }
+
+  /** Desaparece en sombras y reaparece: lejos (con escudo) o a la espalda del héroe. */
+  teleport(player, far = false) {
+    const g = this.game;
+    g.particles.burst(this.pos.x, this.pos.y + 2, this.pos.z, { count: 30, color: 0x6a30c0, speed: 6, up: 3, life: 0.8 });
+    const a = this.spawn.arena;
+    let best = null;
+    for (let k = 0; k < 24; k++) {
+      let x, z;
+      if (far && a) {
+        const [x0, z0] = g.zone.tileToWorld(a[0] + 1, a[1] + 1), [x1, z1] = g.zone.tileToWorld(a[2] - 1, a[3] - 1);
+        x = x0 + Math.random() * (x1 - x0); z = z0 + Math.random() * (z1 - z0);
+        if (Math.hypot(x - player.x, z - player.z) < 9) continue;
+      } else {
+        const ang = player.facing + Math.PI + (Math.random() - 0.5) * 1.2;
+        x = player.x + Math.sin(ang) * 3.2; z = player.z + Math.cos(ang) * 3.2;
+      }
+      if (g.zone.collision.blocked(x, z, this.radius)) continue;
+      best = [x, z]; break;
+    }
+    if (best) { this.pos.x = best[0]; this.pos.z = best[1]; }
+    this.facing = Math.atan2(player.x - this.pos.x, player.z - this.pos.z);
+    g.particles.burst(this.pos.x, this.pos.y + 2, this.pos.z, { count: 30, color: 0x9a50ff, speed: 6, up: 3, life: 0.8 });
+    g.audio.sfx('dodge');
+  }
+
   flash() { this.flashT = 0.2; }
 
   die() {
+    for (const p of this.pylons || []) p.removed = true;
+    if (this.shieldMesh) this.shieldMesh.visible = false;
     this.alive = false;
     this.state = 'dead'; this.stateT = 0;
     this.game.onEnemyKilled(this);
@@ -152,6 +241,17 @@ export class Enemy {
       if (this.phase === 2 && dist > 7 && dist < 16 && Math.random() < 0.5) return 'charge';
       if (this.phase === 2 && dist < 6 && Math.random() < 0.35) return 'slam';
       return dist < this.def.attackRange + 0.4 ? 'swing' : null;
+    }
+    if (ai === 'brute') {
+      if (dist > this.def.attackRange + 0.4) return null;
+      return Math.random() < 0.35 ? 'slam' : 'swing';
+    }
+    if (ai === 'darklord') {
+      if (this.shielded) return dist < 5 || Math.random() < 0.3 ? 'teleport' : 'shoot';
+      if (this.phase === 3 && dist > 7 && dist < 16 && Math.random() < 0.4) return 'charge';
+      if (dist < this.def.attackRange + 0.4) return Math.random() < (this.phase === 3 ? 0.4 : 0.25) ? 'slam' : 'swing';
+      if (dist > 6 && dist < 18) return Math.random() < 0.45 ? 'shoot' : Math.random() < 0.3 ? 'teleport' : null;
+      return null;
     }
     if (ai === 'golem') {
       if (dist > 7 && this.phase === 2) return 'throw';
@@ -247,8 +347,14 @@ export class Enemy {
       }
       case 'windup': {
         const base = this.def.windup || 0.3;
-        const wind = base * (this.attackType === 'charge' ? 1.3 : this.attackType === 'slam' ? 1.2 : 1) * (this.phase === 2 ? 0.75 : 1);
+        const wind = base * (this.attackType === 'charge' ? 1.3 : this.attackType === 'slam' ? 1.2 : 1) * (this.phase >= 2 ? 0.75 : 1);
         this.facing = dampAngle(this.facing, toPlayer, 6, dt);
+        if (this.stateT >= wind && this.attackType === 'teleport') {
+          this.teleport(player, this.shielded);
+          this.state = 'recover'; this.stateT = 0;
+          this.cool = this.def.cooldown * 0.6;
+          break;
+        }
         if (this.stateT >= wind) {
           this.state = 'attack'; this.stateT = 0; this.didHit = false;
           if (this.ai === 'hop') g.audio.sfx('hop');
@@ -281,7 +387,7 @@ export class Enemy {
         }
         if (this.stateT >= dur) {
           this.state = 'recover'; this.stateT = 0;
-          this.cool = this.def.cooldown * (this.phase === 2 ? 0.7 : 1) * (0.8 + Math.random() * 0.4);
+          this.cool = this.def.cooldown * (this.phase >= 2 ? 0.7 : 1) * (this.shielded ? 1.4 : 1) * (0.8 + Math.random() * 0.4);
         }
         break;
       }
@@ -294,6 +400,10 @@ export class Enemy {
         break;
       case 'block':
         if (this.stateT > 0.45) { this.state = 'chase'; this.stateT = 0; this.cool = Math.min(this.cool, 0.15); }
+        break;
+      case 'stun':
+        if (Math.random() < dt * 8) g.particles.spawn(this.pos.x + (Math.random() - 0.5) * 2, this.pos.y + 4.6, this.pos.z + (Math.random() - 0.5) * 2, { color: 0xfff08a, size: 0.8, life: 0.5, gravity: 0, vy: 0.5 });
+        if (this.stateT > (this.def.stunTime || 5)) { this.state = 'chase'; this.stateT = 0; }
         break;
       default: break;
     }
@@ -337,7 +447,7 @@ export class Enemy {
       g.projectiles.spawn({ x: sx, y: sy, z: sz, vx: (tx - sx) / t, vz: (tz - sz) / t, vy: (g.zone.height(tx, tz) + 0.5 - sy + 0.5 * 18 * t * t) / t, gravity: 18, dmg: this.dmg, size: 0.9, color: 0xbfefff, heavy: true, src: this, freeze: 0 });
     } else {
       const sp = p.speed || 11;
-      const n = p.burst || 1;
+      const n = (p.burst || 1) + (this.phase === 3 && this.ai === 'darklord' ? 2 : 0);
       // la tormenta de arena desvía los disparos
       const base = Math.atan2(tx - sx, tz - sz) + (Math.random() - 0.5) * 0.5 * (g.storm?.level || 0);
       for (let i = 0; i < n; i++) {
@@ -454,6 +564,9 @@ export class Enemy {
       else if (this.state === 'recover' && this.attackType !== 'charge' && this.attackType) st.action = { name: clip, t: 1 };
       st.hurt = this.state === 'hurt';
       if (this.state === 'block') st.action = { name: 'Block_Hit', t: Math.min(1, this.stateT / 0.45) };
+      if (this.state === 'stun') st.action = { name: c.stun || 'Hit_B', t: Math.min(0.55, this.stateT / 0.6) };
+      if (this.shielded && (this.state === 'chase' || this.state === 'recover')) st.action = { name: c.shielded || 'Spellcasting', loop: true };
+      if (this.shieldMesh?.visible) this.shieldMesh.material.opacity = 0.18 + Math.sin(this.game.time * 4) * 0.06;
       this.kk.lookTarget = this.state === 'chase' || this.state === 'windup' ? (this._lt || (this._lt = new THREE.Vector3())).set(this.game.player.x, this.game.player.pos.y + 1.4, this.game.player.z) : null;
       this.kk.animate(dt, st);
     } else if (this.cm) {

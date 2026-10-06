@@ -46,7 +46,7 @@ try {
   await page.waitForTimeout(300);
   ok(await page.evaluate(() => window.__game.mode === 'play'), 'empieza la partida en estilo realista');
 
-  for (const zone of ['village', 'forest', 'caves', 'desert']) {
+  for (const zone of ['village', 'forest', 'caves', 'desert', 'shrine_forest', 'shrine_ice', 'shrine_sun', 'castle']) {
     const info = await page.evaluate((zone) => {
       const g = window.__game;
       if (g.zone.id !== zone) g.loadZone(zone, 'start', { silent: true });
