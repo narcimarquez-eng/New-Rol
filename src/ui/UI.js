@@ -354,7 +354,8 @@ export class UI {
       if (!seen[r * z.W + c]) continue;
       dot(it.x, it.z, it.mapColor, full ? 4 : 3);
     }
-    for (const e of g.enemies) if (e.alive && e.state !== 'idle' && e.state !== 'patrol') dot(e.x, e.z, '#ff4d4d', 2.5);
+    for (const e of g.enemies) if (e.alive && e.state !== 'idle' && e.state !== 'patrol' && !e.dormant) dot(e.x, e.z, '#ff4d4d', 2.5);
+    for (const c of g.companions || []) dot(c.x, c.z, c.mapColor || '#7fd0ff', full ? 4 : 3);
     // jugador (flecha)
     const mx = ox + pcx * scale, my = oy + pcz * scale;
     ctx.translate(mx, my);

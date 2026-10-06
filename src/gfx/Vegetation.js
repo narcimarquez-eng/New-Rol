@@ -28,6 +28,7 @@ export const KINDS = {
   hedgeCard: { card: 'hedge', height: 3.2, leaf: 'oak', tint: 0xb8d498, core: 0x2c4620 },
   pineCard: { card: 'pine', height: 9.5, bark: 'pine', leaf: 'pine', tint: 0xb8cca0, core: 0x1f3219 },
   snowPineCard: { card: 'pine', height: 9, bark: 'pine', leaf: 'pine', tint: 0xd8e2e8, core: 0x2a3a30 },
+  scrub: { card: 'hedge', height: 1.1, leaf: 'oak', tint: 0xb4a468, core: 0x5a4e2c }, // matorral seco del desierto
 };
 
 // ------------------------------------------------------------------ tarjetas

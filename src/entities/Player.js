@@ -2,6 +2,8 @@
 // espada, bloqueo con escudo, voltereta con invulnerabilidad), vida y stamina.
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel.js';
+import { KayKitModel } from './KayKitModel.js';
+import { charactersReady } from '../gfx/Characters.js';
 import { clamp, dampAngle, angleDiff } from '../core/utils.js';
 import { TILE } from '../world/tiles.js';
 
@@ -14,10 +16,17 @@ const SPRINT_COST = 14; // por segundo
 const COMBO_TIMES = [0.42, 0.42, 0.58];
 const SLIDE_SPEED = 10;
 
+/** Protagonista: el explorador rubio (pícaro KayKit) con la espada y el escudo del caballero. */
+export const HERO = {
+  model: 'rogue', show: ['Rogue_Cape'], recolor: { '1,0': '#f3dc8a' },
+  borrow: { r: ['knight', '1H_Sword'], l: ['knight', 'Badge_Shield'] }, height: 1.85,
+};
+
 export class Player {
   constructor(game) {
     this.game = game;
-    this.model = new CharacterModel({ sword: true, shield: true, face: 'hero', ears: 'pointy', eyes: '#2f6fd0', hatStyle: 'cap' });
+    this.model = charactersReady() ? new KayKitModel(HERO)
+      : new CharacterModel({ sword: true, shield: true, face: 'hero', ears: 'pointy', eyes: '#2f6fd0', hatStyle: 'cap' });
     this.root = this.model.root;
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector2(); // velocidad de empuje (retroceso, voltereta)
@@ -61,8 +70,9 @@ export class Player {
   setSwordGlow(on, color = 0x8fe3ff) {
     if (!this.model.weapon) return;
     if (on && !this.swordGlow) {
-      const glow = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.1, 0.06), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity: 0.5, toneMapped: false }));
-      glow.position.y = 0.74;
+      const L = this.model.bladeLength ?? 1.35; // largo de la hoja en el espacio del arma
+      const glow = new THREE.Mesh(new THREE.BoxGeometry(0.18 * L / 1.35, L * 0.8, 0.06 * L / 1.35), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity: 0.5, toneMapped: false }));
+      glow.position.y = L * 0.55;
       this.model.weapon.add(glow);
       this.swordGlow = glow;
     } else if (on) this.swordGlow.material.color.set(color).multiplyScalar(1.6);
@@ -73,6 +83,14 @@ export class Player {
     this.chillT = Math.max(this.chillT, t);
     this.model.flash(0.4, 0x7fdcff);
     this.game.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, { count: 14, color: 0xcff6ff, speed: 3, up: 2, life: 0.6 });
+  }
+
+  /** Veneno (escorpiones): quita medio corazón cada 1,5 s durante t segundos, sin llegar a matar. */
+  poison(t) {
+    this.poisonT = Math.max(this.poisonT || 0, t);
+    this.poisonTick = this.poisonTick ?? 1.5;
+    this.model.flash(0.4, 0x7dff4a);
+    this.game.ui.toast('¡Envenenado! Una poción lo cura.');
   }
 
   /** Lógica de hielo: devuelve true si el deslizamiento controla el movimiento este frame. */
@@ -186,6 +204,14 @@ export class Player {
       this.chillT -= dt;
       if (Math.random() < dt * 8) g.particles.spawn(this.pos.x + (Math.random() - 0.5), this.pos.y + 0.5 + Math.random(), this.pos.z + (Math.random() - 0.5), { color: 0xcff6ff, size: 0.5, life: 0.6, gravity: 1 });
     }
+    if (this.poisonT > 0) {
+      this.poisonT -= dt; this.poisonTick -= dt;
+      if (Math.random() < dt * 6) g.particles.spawn(this.pos.x + (Math.random() - 0.5) * 0.8, this.pos.y + 0.6 + Math.random(), this.pos.z + (Math.random() - 0.5) * 0.8, { color: 0x7dff4a, size: 0.45, life: 0.6, gravity: -1 });
+      if (this.poisonTick <= 0) {
+        this.poisonTick = 1.5;
+        if (this.hp > 1) { this.hp -= 1; this.model.flash(0.2, 0x7dff4a); g.events.emit('playerHurt', { hp: this.hp }); }
+      }
+    }
     const slow = this.chillT > 0 ? 0.55 : 1;
     if (this.state === 'normal' && this.updateIce(dt, dx, dz, mag)) {
       // el hielo controla el movimiento (sin atacar ni esquivar mientras se desliza)
@@ -193,6 +219,9 @@ export class Player {
     } else if (this.state === 'normal') {
       if (mag > 0.05) {
         speed = (sprinting ? SPRINT : SPEED) * mag * (this.blocking ? 0.4 : 1) * slow;
+        // caminar contra el viento de una tormenta de arena cuesta más
+        const st = g.storm;
+        if (st && st.level > 0.05) speed *= 1 - 0.3 * st.level * Math.max(0, -(dx * st.windDir.x + dz * st.windDir.y));
         if (!this.blocking) this.facing = dampAngle(this.facing, Math.atan2(dx, dz), 14, dt);
         else this.facing = dampAngle(this.facing, Math.atan2(dx, dz), 4, dt);
         this.moveBy(dx * speed * dt, dz * speed * dt);
@@ -244,6 +273,10 @@ export class Player {
     this.pos.y = THREE.MathUtils.lerp(this.pos.y, ground, 1 - Math.exp(-20 * dt));
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.facing;
+    // la cabeza sigue al enemigo más cercano (o al personaje con el que se habla)
+    const foe = g.combat.nearestEnemy(this.pos.x, this.pos.z, 9);
+    if (foe) this.model.lookTarget = (this._look || (this._look = new THREE.Vector3())).set(foe.x, this.pos.y + 1.2, foe.z);
+    else this.model.lookTarget = g.lookTarget || null;
     this.model.animate(dt, {
       speed: this.speedNorm,
       attack: this.state === 'attack' ? { t: this.stateT / COMBO_TIMES[this.combo], combo: this.combo } : null,

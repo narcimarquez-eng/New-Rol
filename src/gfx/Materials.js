@@ -5,7 +5,7 @@
 //  - terrainMaterial(): mezcla 4 capas (césped, tierra, piedra, nieve) según
 //    pesos por vértice, con detalle de normales y rugosidad por capa.
 import * as THREE from 'three';
-import { tex, rockTextures, cobbleTextures, snowTextures, iceTextures } from './Textures.js';
+import { tex, rockTextures, cobbleTextures, snowTextures, iceTextures, sandTextures, flagstoneTextures, clayTextures } from './Textures.js';
 
 const TRI_VERT_PARS = 'varying vec3 vTriPos;\nvarying vec3 vTriN;\n';
 const TRI_VERT = `
@@ -157,25 +157,32 @@ function averageColor(texture, target) {
   if (!done()) { const id = setInterval(() => { if (done()) clearInterval(id); }, 150); }
 }
 
-let terrainMat = null;
+const terrainMats = new Map();
 /**
- * Material del terreno. Los pesos de capa llegan en el atributo `splat`
- * (césped, tierra, piedra, nieve) y el color por vértice da el tono de la zona;
- * las texturas aportan el detalle (se normalizan por su color medio).
+ * Material del terreno. Los pesos de capa llegan en el atributo `splat` y el
+ * color por vértice da el tono de la zona; las texturas aportan el detalle (se
+ * normalizan por su color medio). Cada variante elige sus cuatro capas:
+ *   default: césped, tierra, adoquines, nieve · desert: césped del oasis, arena, losas, tierra agrietada
  */
-export function terrainMaterial() {
-  if (terrainMat) return terrainMat;
+export function terrainMaterial(variant = 'default') {
+  if (terrainMats.has(variant)) return terrainMats.get(variant);
+  const desert = variant === 'desert';
   const grass = tex('tex/grass.jpg');
-  const dirt = tex('tex/dirt_color.jpg');
-  const dirtN = tex('tex/dirt_normal.jpg', { srgb: false });
-  const cobble = cobbleTextures();
-  const snow = snowTextures();
+  const sand = desert ? sandTextures() : null;
+  const dirt = desert ? sand.map : tex('tex/dirt_color.jpg');
+  const dirtN = desert ? sand.normalMap : tex('tex/dirt_normal.jpg', { srgb: false });
+  const cobble = desert ? flagstoneTextures() : cobbleTextures();
+  const snow = desert ? clayTextures() : snowTextures();
+  // escala (repeticiones por unidad) de cada capa
+  const sc = desert ? { d: 0.07, s: 0.15, n: 0.12 } : { d: 0.22, s: 0.5, n: 0.11 };
+  const rough = desert ? new THREE.Vector4(0.96, 0.93, 0.84, 0.95) : new THREE.Vector4(0.97, 0.93, 0.86, 0.72);
   const avg = { g: new THREE.Color(0.2, 0.3, 0.1), d: new THREE.Color(0.3, 0.25, 0.2), s: new THREE.Color(0.4, 0.4, 0.4), n: new THREE.Color(0.9, 0.9, 0.95) };
   averageColor(grass, avg.g); averageColor(dirt, avg.d);
   averageColor(cobble.map, avg.s); averageColor(snow.map, avg.n);
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
+      scD: { value: sc.d }, scS: { value: sc.s }, scN: { value: sc.n }, layerRough: { value: rough },
       tGrass: { value: grass }, tDirt: { value: dirt }, tDirtN: { value: dirtN },
       tStone: { value: cobble.map }, tStoneN: { value: cobble.normalMap },
       tSnow: { value: snow.map }, tSnowN: { value: snow.normalMap },
@@ -188,30 +195,32 @@ export function terrainMaterial() {
     sh.fragmentShader = `varying vec4 vSplat; varying vec3 vWPos;
       uniform sampler2D tGrass, tDirt, tDirtN, tStone, tStoneN, tSnow, tSnowN;
       uniform vec3 avgG, avgD, avgS, avgN;
+      uniform float scD, scS, scN;
+      uniform vec4 layerRough;
     ` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec4 sw = vSplat / max(dot(vSplat, vec4(1.0)), 1e-3);
         vec2 uw = vWPos.xz;
         // dos escalas de césped para ocultar la repetición
         vec3 tg = texture2D(tGrass, uw * 0.17).rgb * 0.6 + texture2D(tGrass, uw * 0.047 + 0.37).rgb * 0.4;
-        vec3 td = texture2D(tDirt, uw * 0.22).rgb;
-        vec3 ts = texture2D(tStone, uw * 0.5).rgb;
-        vec3 tn = texture2D(tSnow, uw * 0.11).rgb;
+        vec3 td = texture2D(tDirt, uw * scD).rgb;
+        vec3 ts = texture2D(tStone, uw * scS).rgb;
+        vec3 tn = texture2D(tSnow, uw * scN).rgb;
         vec3 detail = (tg / max(avgG, 0.02)) * sw.x + (td / max(avgD, 0.02)) * sw.y + (ts / max(avgS, 0.02)) * sw.z + (tn / max(avgN, 0.02)) * sw.w;
         diffuseColor.rgb *= clamp(detail, 0.2, 1.9);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = dot(sw, vec4(0.97, 0.93, 0.86, 0.72));`)
+        roughnessFactor = dot(sw, layerRough);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          vec2 nd = texture2D(tDirtN, uw * 0.22).xy * 2.0 - 1.0;
-          vec2 ns = texture2D(tStoneN, uw * 0.5).xy * 2.0 - 1.0;
-          vec2 nn = texture2D(tSnowN, uw * 0.11).xy * 2.0 - 1.0;
+          vec2 nd = texture2D(tDirtN, uw * scD).xy * 2.0 - 1.0;
+          vec2 ns = texture2D(tStoneN, uw * scS).xy * 2.0 - 1.0;
+          vec2 nn = texture2D(tSnowN, uw * scN).xy * 2.0 - 1.0;
           vec2 p = nd * (sw.y * 0.9 + sw.x * 0.35) + ns * sw.z * 1.1 + nn * sw.w * 0.5;
           normal = normalize(normal + (viewMatrix * vec4(p.x, 0.0, -p.y, 0.0)).xyz);
         }`);
   };
   m.customProgramCacheKey = () => 'terrain-real';
-  terrainMat = m;
+  terrainMats.set(variant, m);
   return m;
 }
 

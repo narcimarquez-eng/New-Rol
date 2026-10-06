@@ -8,6 +8,10 @@ import { EventBus } from './EventBus.js';
 import { Save } from './Save.js';
 import { Zone } from '../world/Zone.js';
 import { Player } from '../entities/Player.js';
+import { Companion } from '../entities/Companion.js';
+import { Sandstorm } from '../systems/Sandstorm.js';
+import { COMPANIONS } from '../data/companions.js';
+import { charactersReady } from '../gfx/Characters.js';
 import { Enemy } from '../entities/Enemy.js';
 import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetStone } from '../entities/Interactables.js';
 import { Particles } from '../systems/Particles.js';
@@ -53,11 +57,13 @@ export class Game {
     this.enemies = [];
     this.interactables = [];
     this.dummies = [];
+    this.companions = [];
     this.hitstopT = 0;
     this.saveTimer = 0;
     this.godMode = params.has('god');
 
     this.setupLights(lowQuality);
+    this.storm = new Sandstorm(this);
     this.lastFrame = performance.now();
 
     document.addEventListener('pointerlockchange', () => {
@@ -250,6 +256,7 @@ export class Game {
 
   setMode(m) {
     this.mode = m;
+    if (m !== 'dialog') this.lookTarget = null;
     if (m !== 'play') this.ui.prompt(null);
   }
 
@@ -286,9 +293,11 @@ export class Game {
     this.zone = zone;
     this.scene.add(zone.group);
     this.applyZoneLighting(zone);
+    this.storm?.reset(zone);
 
     // entidades dinámicas
     for (const e of data.entities) {
+      if (e.when && !this.progress.check(e.when)) continue; // aparece solo si se cumplen sus condiciones
       switch (e.type) {
         case 'npc': this.addInteractable(new NPC(this, e)); break;
         case 'chest': this.addInteractable(new Chest(this, e)); break;
@@ -320,6 +329,7 @@ export class Game {
     const [sx, sz] = zone.tileToWorld(...spawn.tile);
     this.player.place(sx, sz, spawn.facing || 0);
     this.lastSpawn = spawn.id;
+    this.spawnCompanions();
     this.cam.snapBehind(this.player);
     if (!silent) {
       this.audio.playMusic(data.music);
@@ -327,6 +337,33 @@ export class Game {
       if (data.enterFlag) this.progress.flags.add(data.enterFlag);
       this.save();
     }
+  }
+
+  /** Crea (o recoloca) a los compañeros que se han unido al grupo. */
+  spawnCompanions() {
+    for (const c of this.companions) { this.scene.remove(c.root); c.dispose(); }
+    this.companions = [];
+    if (!charactersReady()) return;
+    Object.keys(COMPANIONS).forEach((id) => {
+      if (!this.progress.flags.has(`companion_${id}`)) return;
+      const c = new Companion(this, id, this.companions.length);
+      this.companions.push(c);
+      this.scene.add(c.root);
+      c.placeNear(this.player);
+    });
+  }
+
+  /** Un compañero se une al grupo (acción de diálogo { recruit }). */
+  recruit(id, npc) {
+    const def = COMPANIONS[id];
+    if (!def || this.progress.flags.has(`companion_${id}`)) return;
+    this.progress.flags.add(`companion_${id}`);
+    if (npc) { npc.removed = true; this.zone.collision.remove(npc.collider); }
+    this.spawnCompanions();
+    const c = this.companions.find((k) => k.id === id);
+    if (c && npc) { c.pos.set(npc.x, npc.y, npc.z); c.facing = npc.facing; }
+    this.audio.sfx('quest');
+    this.ui.toast(`¡${def.name} ${def.title} se une a tu grupo!`);
   }
 
   addInteractable(it) {
@@ -415,6 +452,8 @@ export class Game {
     const say = (lines, opts = {}) => {
       npc.talking = true;
       this.setMode('dialog');
+      // el héroe mira a quien le habla
+      this.lookTarget = new THREE.Vector3(npc.root.position.x, npc.root.position.y + 1.4, npc.root.position.z);
       this.ui.openDialog(npc.name, lines, opts);
       this.talkingNpc = npc;
     };
@@ -433,7 +472,7 @@ export class Game {
     const qs = npc.data.quests || [];
     for (const id of qs) {
       const q = QUESTS[id], st = pr.questState(id);
-      if (st === 'ready') return say(q.lines.complete, { onEnd: () => { if (q.consume && q.item) pr.take(q.item, q.count); this.completeQuest(id); } });
+      if (st === 'ready') return say(q.lines.complete, { onEnd: () => { if (q.consume && q.item) pr.take(q.item, q.count); this.completeQuest(id, npc); } });
       if (st === 'active') return say(q.lines.active);
       if (st === 'none' && pr.check(q.requires)) {
         return say(q.lines.offer, {
@@ -450,15 +489,16 @@ export class Game {
     const doneQuest = [...qs].reverse().find((id) => pr.questState(id) === 'done');
     if (doneQuest && (!rule || !rule.when)) lines = QUESTS[doneQuest].lines.done;
     const end = () => {
-      if (rule?.do) this.runActions(rule.do);
+      if (rule?.do) this.runActions(rule.do, npc);
       if (npc.data.heal) this.healFull(npc);
       if (npc.data.shop) this.ui.openShop(npc);
     };
     return say(lines, { onEnd: end });
   }
 
-  runActions(actions) {
+  runActions(actions, npc = null) {
     for (const a of actions) {
+      if (a.recruit) this.recruit(a.recruit, npc);
       if (a.flag) this.progress.flags.add(a.flag);
       if (a.give) this.giveItem(a.give[0], a.give[1] || 1, { fanfare: true });
       if (a.take) this.progress.take(a.take[0], a.take[1] || 1);
@@ -475,9 +515,10 @@ export class Game {
     this.save();
   }
 
-  completeQuest(id) {
+  completeQuest(id, npc = null) {
     const q = QUESTS[id];
     this.progress.finishQuest(id);
+    if (q.recruit) setTimeout(() => this.recruit(q.recruit, npc), 600); // el que encarga la misión se une al grupo
     this.audio.sfx('quest');
     this.ui.toast(`¡Misión completada: ${q.name}!`);
     q.reward.forEach(([item, n], i) => setTimeout(() => this.giveItem(item, n, { fanfare: true }), 300 + i * 1300));
@@ -520,6 +561,7 @@ export class Game {
     }
     if (fanfare && !silent) {
       this.ui.itemGet(id, qty);
+      this.player.model.play?.('Cheer', { timeScale: 1.15 }); // el héroe celebra el hallazgo
       this.audio.sfx(it.kind === 'key' || it.kind === 'upgrade' ? 'item' : 'coin');
     }
     // avisar si una misión de recolección quedó lista
@@ -531,9 +573,10 @@ export class Game {
   usePotion() {
     const p = this.player, pr = this.progress;
     if (!pr.has('potion')) { this.ui.toast('No tienes pociones.'); return; }
-    if (p.hp >= p.maxHp) { this.ui.toast('Ya tienes la vida completa.'); return; }
+    if (p.hp >= p.maxHp && !(p.poisonT > 0)) { this.ui.toast('Ya tienes la vida completa.'); return; }
     pr.take('potion');
     p.heal(ITEMS.potion.heal);
+    p.poisonT = 0; // la poción también cura el veneno
     this.audio.sfx('potion');
     this.particles.sparkle(p.x, p.pos.y, p.z, { color: 0xff6b8a, count: 30 });
   }
@@ -606,6 +649,7 @@ export class Game {
       this.cam.yaw += dt * 0.05;
       this.zone.update(this.time);
       for (const i of this.interactables) i.update(dt);
+      this.player.model.animate(dt, { speed: 0 }); // reposo (los modelos con esqueleto necesitan animarse)
       this.cam.update(dt, { mouseDX: 0, mouseDY: 0, wheel: 0 }, this.player, this.zone);
       this.updateLights();
       this.particles.update(dt);
@@ -637,6 +681,8 @@ export class Game {
       } else {
         this.player.update(simDt, { moveVector: () => ({ x: 0, y: 0 }), isDown: () => false, consume: () => false }, this.cam.yaw);
       }
+      for (const c of this.companions) c.update(simDt);
+      this.storm.update(simDt);
       for (const e of this.enemies) e.update(simDt, this.player);
       this.projectiles.update(simDt);
       this.combat.separate();

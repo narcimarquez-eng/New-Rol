@@ -121,4 +121,49 @@ export const QUESTS = {
       done: ['La fuente siempre curará tus heridas. Acércate cuando lo necesites.'],
     },
   },
+  // ---------------------------------------------------------------- Desierto Perdido
+  q_borg: {
+    name: 'Huesos en la arena', zone: 'desert', giver: 'borg', type: 'kill', enemy: 'skeletonMinion', count: 4,
+    desc: 'Borg el Bárbaro quiere ver de qué pasta estás hecho: destruye 4 esqueletos enterrados (se levantan al acercarte).',
+    reward: [['potion', 1]], recruit: 'borg',
+    lines: {
+      offer: ['¡JA! ¿Otro aventurero perdido en las dunas?', 'Los esqueletos se levantan de la arena cuando pasas a su lado. Yo ya he roto unos cuantos.', 'Destruye cuatro y te acompañaré hasta el mismísimo templo. ¿Trato hecho?'],
+      active: ['Hay esqueletos enterrados por todo el desierto: en las dunas del sur, en las del este... ¡y delante del templo!'],
+      complete: ['¡Cuatro! No está mal para alguien con ese escudito.', '¡Borg va contigo! Mi hacha y tu espada, ¿quién nos va a parar?'],
+      done: ['¡Adelante!'],
+    },
+  },
+  q_scorpions: {
+    name: 'Plaga de escorpiones', zone: 'desert', giver: 'zahra', type: 'kill', enemy: 'scorpion', count: 5,
+    desc: 'Los escorpiones de las dunas del este atacan las caravanas de Zahra. Derrota a 5.',
+    reward: [['heart_container', 1], ['coin', 40]],
+    lines: {
+      offer: ['Bienvenido a mi puesto, viajero. Agua, pociones... y malas noticias.', 'Los escorpiones del este han envenenado a dos de mis camellos.', 'Si acabas con cinco, te daré algo muy valioso.'],
+      active: ['Los escorpiones viven en las dunas del este, entre los cactus. Su aguijón envenena: una poción lo cura.'],
+      complete: ['¡Por fin podré mandar la caravana! Toma: lo encontré en una tumba del cañón.'],
+      done: ['Las caravanas vuelven a pasar. ¡Gracias!'],
+    },
+  },
+  q_amulet: {
+    name: 'El amuleto de la familia', zone: 'desert', giver: 'cedric', type: 'collect', item: 'amulet', count: 1, consume: true,
+    desc: 'Sir Cedric perdió el amuleto de su familia en las ruinas del oeste. Dice que lo vio caer detrás de un muro... que no parecía un muro.',
+    reward: [['stamina_up', 1], ['coin', 50]],
+    lines: {
+      offer: ['Saludos. Soy Sir Cedric, de la guardia del castillo.', 'Huyendo de los esqueletos de las ruinas del oeste perdí el amuleto de mi familia.', 'Cayó tras un muro al sur de las ruinas... juraría que el muro se movió. ¿Lo buscarías?'],
+      active: ['Al suroeste de las ruinas hay una pared que no es como las demás. Prueba a atravesarla.'],
+      complete: ['¡El amuleto de mi padre! No sé cómo agradecértelo.', 'Toma este elixir: los caballeros lo bebemos antes de las batallas largas.'],
+      done: ['Cuando lleguemos al castillo, lucharé a tu lado. Lo prometo.'],
+    },
+  },
+  q_shards: {
+    name: 'Fragmentos de sol', zone: 'desert', giver: 'aldric', type: 'collect', item: 'sun_shard', count: 3, consume: true, requires: { flag: 'met_aldric' },
+    desc: 'Sir Aldric busca 3 fragmentos solares perdidos: brillan en el cañón, en el oasis y en las dunas del sureste.',
+    reward: [['potion', 2], ['coin', 80]],
+    lines: {
+      offer: ['Cuando el templo cayó, su gran cristal se rompió en pedazos.', 'Tres fragmentos siguen brillando en el desierto: en el cañón del este, en el oasis y en las dunas del sureste.', 'Tráemelos y te recompensaré.'],
+      active: ['Brillan como pequeños soles. Uno en el cañón, otro junto al oasis y otro en las dunas del sureste.'],
+      complete: ['¡Los tres fragmentos! El templo aún guarda su luz.', 'Toma esto para el camino. Lo vas a necesitar.'],
+      done: ['Que la luz del sol te guíe.'],
+    },
+  },
 };

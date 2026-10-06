@@ -7,6 +7,7 @@ import { spart, smerge, rockify, gradientMap as kitGradient, litMaterial } from 
 import { REALISTIC } from '../gfx/Style.js';
 import { fbm } from '../core/utils.js';
 import { triplanar, woodTextures, plasterTextures, roofTextures, rockTextures } from '../gfx/Materials.js';
+import { sandstoneTextures } from '../gfx/Textures.js';
 import { barkMat, endGrainMat } from '../gfx/Vegetation.js';
 import { flameMesh, embers } from '../gfx/Fire.js';
 
@@ -490,6 +491,7 @@ export function buildChest({ big = false } = {}) {
 
 /** Puerta/verja con cerradura. color indica la llave necesaria. */
 export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) {
+  if (style === 'stone') return stoneGate(width, color);
   const g = new THREE.Group();
   const icy = style === 'ice' || style === 'icewall';
   const frameCol = icy ? 0x7f93ad : 0x6d6d6d, frameCol2 = icy ? 0x6f839d : 0x5d5d5d;
@@ -521,6 +523,38 @@ export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) 
     door = new THREE.Mesh(merge(doorParts), toonMat());
   }
   door.castShadow = true;
+  g.add(door);
+  g.userData.door = door;
+  return g;
+}
+
+/** Puerta de templo: losa de arenisca entre dos pilares, con un sol de oro (la cerradura). */
+function stoneGate(width, color) {
+  const g = new THREE.Group();
+  const stone = triplanar({ key: 'sandstone-gate', set: sandstoneTextures(), scale: 0.3, normalStrength: 1, vertexColors: true, color: 0xffffff });
+  const frame = new THREE.Mesh(smerge([
+    spart(new THREE.BoxGeometry(1.0, 5.6, 1.2), 0xf0dcc0, { x: -width / 2 - 0.2, y: 2.8, ao: 0.3 }),
+    spart(new THREE.BoxGeometry(1.0, 5.6, 1.2), 0xf0dcc0, { x: width / 2 + 0.2, y: 2.8, ao: 0.3 }),
+    spart(new THREE.BoxGeometry(width + 2.0, 1.0, 1.4), 0xe8d2b0, { y: 5.9, ao: 0.1 }),
+  ]), stone);
+  frame.castShadow = true; frame.receiveShadow = true;
+  g.add(frame);
+  const slab = smerge([spart(new THREE.BoxGeometry(width - 0.1, 4.6, 0.7), 0xe6d0ac, { y: 2.3, ao: 0.2 })]);
+  const door = new THREE.Mesh(slab, stone);
+  // sol de oro en relieve: disco y rayos
+  const gold = new THREE.MeshStandardMaterial({ color, metalness: 0.9, roughness: 0.3, emissive: new THREE.Color(color), emissiveIntensity: 0.15 });
+  const sun = new THREE.Group();
+  sun.add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.12, 20).rotateX(Math.PI / 2), gold));
+  for (let i = 0; i < 12; i++) {
+    const ray = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.45, 4), gold);
+    const a = (i / 12) * Math.PI * 2;
+    ray.position.set(Math.cos(a) * 0.65, Math.sin(a) * 0.65, 0);
+    ray.rotation.z = a - Math.PI / 2;
+    sun.add(ray);
+  }
+  sun.position.set(0, 2.6, 0.38);
+  door.add(sun);
+  door.castShadow = true; door.receiveShadow = true;
   g.add(door);
   g.userData.door = door;
   return g;

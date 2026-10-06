@@ -42,8 +42,19 @@ export function buildBackdrop(halfW, halfH, o = {}) {
     // deformación del dominio: crestas curvas en vez de rejilla
     const wx = x + (fbm(x * 0.004, z * 0.004, seed + 3, 3) - 0.5) * 160;
     const wz = z + (fbm(x * 0.004 + 9.1, z * 0.004 - 4.7, seed + 5, 3) - 0.5) * 160;
-    const foot = fbm(wx * 0.012, wz * 0.012, seed + 11, 4) * hills * smooth(3, 70, d);
-    const mount = Math.pow(ridged(wx * 0.0042, wz * 0.0042, seed), 1.35) * peak * smooth(40, 330, d);
+    let foot = fbm(wx * 0.012, wz * 0.012, seed + 11, 4) * hills * smooth(3, 70, d);
+    let mount = Math.pow(ridged(wx * 0.0042, wz * 0.0042, seed), 1.35) * peak * smooth(40, 330, d);
+    if (o.style === 'desert') {
+      // dunas en primer plano (crestas asimétricas) y mesetas escalonadas al fondo
+      const ph = (wx * 0.5 + wz) * 0.012;
+      const f = ph - Math.floor(ph);
+      const r = f < 0.72 ? f / 0.72 : 1 - (f - 0.72) / 0.28;
+      foot = r * r * (3 - 2 * r) * hills * (0.4 + fbm(wx * 0.006, wz * 0.006, seed + 13, 2)) * smooth(3, 60, d);
+      const m = fbm(wx * 0.0035, wz * 0.0035, seed + 17, 4);
+      const mesa = smooth(0.48, 0.56, m); // borde nítido de la meseta
+      const steps = Math.floor(m * 6) / 6; // terrazas
+      mount = (mesa * (0.55 + steps * 0.6) + smooth(0.3, 0.5, m) * 0.12) * peak * smooth(60, 300, d);
+    }
     pos.setY(i, -0.6 + foot + mount);
   }
   geo.computeVertexNormals();
@@ -66,6 +77,15 @@ export function buildBackdrop(halfW, halfH, o = {}) {
     const rockAmt = Math.max(smooth(0.86, 0.7, ny), smooth(snowline * 0.6, snowline * 0.9, y) * 0.85);
     tmp.lerp(rock, rockAmt);
     // nieve por encima de la cota, salvo en paredes muy verticales
+    if (o.style === 'desert') {
+      // arena en lo bajo y en las cimas planas, roca rojiza en los cantiles con estratos
+      const strata = 0.85 + Math.sin(y * 0.55 + n1 * 3) * 0.12;
+      tmp.copy(meadow).lerp(forest, smooth(0.35, 0.65, n1) * 0.5);
+      tmp.lerp(rock.clone().multiplyScalar(strata), smooth(0.88, 0.6, ny));
+      const v = 0.92 + noise2(x * 0.15, z * 0.15, seed + 77) * 0.16;
+      col[i * 3] = tmp.r * v; col[i * 3 + 1] = tmp.g * v; col[i * 3 + 2] = tmp.b * v;
+      continue;
+    }
     const sl = snowline + (n1 - 0.5) * 18;
     const snowAmt = smooth(sl - 6, sl + 6, y) * smooth(0.55, 0.75, ny);
     tmp.lerp(snow, snowAmt);

@@ -1,14 +1,16 @@
 # New Rol
 
 Aventura de acción 3D para el navegador, inspirada en los Zelda clásicos.
-Hecha con **Three.js**: modelos, animaciones, árboles, montañas, música y efectos de
-sonido se generan por código; solo unas pocas texturas de corteza, hojas, césped y
-tierra (libres, ver [Créditos](#créditos)) vienen de fuera.
+Hecha con **Three.js**: escenarios, árboles, montañas, música y efectos de sonido se
+generan por código. Los personajes (héroe, compañeros y esqueletos) son los packs
+libres **KayKit** con sus animaciones, y unas pocas texturas de corteza, hojas, césped
+y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 
 **▶ Jugar:** https://narcimarquez-eng.github.io/new-rol/
 
-> Fases completadas: **1** (motor, Aldea Inicial, Bosque Encantado) y **2** (renovación gráfica y Cuevas Heladas).
-> Próximas fases: Desierto Perdido y Castillo Final.
+> Fases completadas: **1** (motor, Aldea Inicial, Bosque Encantado), **2** (Cuevas Heladas)
+> y **3** (Desierto Perdido, nuevo héroe animado y compañeros de aventura).
+> Próxima fase: Castillo Final.
 > Estilo visual realista (PBR) por defecto; añade `?toon` a la URL para el estilo ilustrado.
 
 ## Controles
@@ -44,6 +46,13 @@ tierra (libres, ver [Créditos](#créditos)) vienen de fuera.
   atasca, toca la **piedra rúnica** para devolverlo a su sitio.
 - Algunos enemigos de las cuevas **congelan**: te ralentizan unos segundos.
 - Los proyectiles se pueden **bloquear con el escudo** o **romper con la espada**.
+- **Compañeros**: Kael el Encapuchado y Borg el Bárbaro se unen al grupo en el desierto.
+  Te siguen por todas las zonas y atacan solos a los enemigos que se te acercan.
+- En el desierto, los **esqueletos guerreros** paran los golpes de frente con el escudo:
+  el tercer golpe del combo rompe su guardia. Los **esqueletos enterrados** se levantan
+  de la arena al acercarte, y el aguijón de los **escorpiones** envenena (la poción lo cura).
+- Las **tormentas de arena** llegan cada poco: casi no se ve, el viento frena si caminas
+  contra él… y los enemigos tampoco te ven bien ni aciertan sus disparos.
 
 ### Contenido de la Fase 1
 
@@ -60,6 +69,24 @@ tierra (libres, ver [Créditos](#créditos)) vienen de fuera.
   rocas lanzadas y refuerzos). Recompensa: la **Llave de Fuego**, que derrite el muro
   del norte. 3 misiones (Sopa caliente, Lobos hambrientos, Cristales de escarcha) y una
   más para el herrero de la aldea (Mineral de las cuevas → Espada de acero).
+
+### Contenido de la Fase 3
+
+- **Nuevo héroe**: el explorador rubio de túnica verde (personaje KayKit) con 49
+  animaciones reales compartidas: combo de tres tajos, voltereta, bloqueo, golpes,
+  muerte y celebración. Encima, una capa dinámica: transiciones suaves por peso, pasos
+  sincronizados con la velocidad, inclinación en giros y arranques, y la cabeza que
+  sigue al enemigo más cercano o a quien te habla.
+- **Desierto Perdido**: dunas, oasis con palmeras y el campamento de Borg, ruinas del
+  oeste (Llave del Sol y una cámara tras un muro falso), dunas del este con cactus y
+  escorpiones, el cañón de los hechiceros y el **Templo del Sol**, donde el
+  **Rey de las Arenas** (jefe de 2 fases que levanta esqueletos de la arena) guarda la
+  **Llave del Castillo**.
+- 5 tipos de enemigo: escorpión, esqueleto guerrero (escudo), ballestero, hechicero
+  (orbes de tres en tres) y esqueleto enterrado.
+- 4 misiones: Huesos en la arena (Borg se une al grupo), Plaga de escorpiones,
+  El amuleto de la familia y Fragmentos de sol. Personajes: Kael, Borg, el mercader
+  Zahir y los caballeros Sir Aldric y Sir Cedric.
 
 ### Gráficos
 
@@ -92,9 +119,13 @@ más ligero y es el que usan los tests de lógica.
 En los dos: hierba instanciada que se mece y se aparta al pasar, calidad adaptativa
 (si los FPS bajan se desactivan efectos) y `?low` para forzar la calidad baja.
 
-Los personajes siguen siendo los mismos modelos estilizados en ambos estilos: para
-personajes realistas harían falta modelos 3D con esqueleto y animaciones hechas por
-un artista (o de una librería como Mixamo).
+Desierto: arena con ondulaciones de viento, losas de arenisca, tierra agrietada, dunas en
+el propio terreno, mesetas escalonadas al fondo, palmeras, cactus, ruinas y columnas, todo
+procedural.
+
+Los personajes son los modelos estilizados KayKit (low-poly con esqueleto y animaciones).
+Para personajes realistas harían falta modelos 3D hechos por un artista (o de una
+librería como Mixamo); el sistema de animación ya está preparado para cambiarlos.
 
 ## Desarrollo
 
@@ -102,8 +133,10 @@ un artista (o de una librería como Mixamo).
 npm install
 npm run dev        # servidor de desarrollo (http://localhost:5173)
 npm run build      # compila a dist/
-npm test           # test end-to-end en Chromium headless (Playwright): Fases 1 y 2 completas (estilo ?toon)
-node tests/real-smoke.mjs    # prueba de humo del estilo realista: las 3 zonas, sin errores
+npm test           # test end-to-end en Chromium headless (Playwright): Fases 1, 2 y 3 completas (estilo ?toon)
+node tests/real-smoke.mjs    # prueba de humo del estilo realista: las 4 zonas, sin errores
+node tools/build-characters.mjs   # regenera los personajes KayKit optimizados (descarga los packs)
+python3 tools/gen_desert.py --check   # comprueba que todo el desierto es alcanzable
 node tests/data.mjs  # validación de los datos de las zonas
 node tests/caves-quick.mjs   # traza rápida del puzle de bloques de las cuevas
 node tests/shots.mjs '[{"zone":"caves","c":22,"r":45}]'   # capturas para revisión visual
@@ -162,5 +195,8 @@ Source: GitHub Actions**.
   césped y tierra de `public/assets/`.
 - `waternormals.jpg` y los objetos `Sky` y `Water` de los ejemplos de
   [Three.js](https://threejs.org) (MIT).
-- Todo lo demás (modelos, texturas de adoquín, yeso, madera, tejas, roca y nieve,
-  música y sonido) se genera por código en este repositorio.
+- Personajes y armas: packs **KayKit Adventurers** y **KayKit Skeletons** de
+  [Kay Lousberg](https://www.kaylousberg.com) (CC0), optimizados con
+  `tools/build-characters.mjs` (modelos sin animaciones + un archivo de animaciones compartido).
+- Todo lo demás (escenarios, texturas de adoquín, yeso, madera, tejas, roca, nieve, arena
+  y arenisca, música y sonido) se genera por código en este repositorio.

@@ -3,6 +3,7 @@
 import village from './village.js';
 import forest from './forest.js';
 import caves from './caves.js';
+import desert from './desert.js';
 
-export const ZONES = { village, forest, caves };
+export const ZONES = { village, forest, caves, desert };
 export const START_ZONE = 'village';

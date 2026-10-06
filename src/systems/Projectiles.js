@@ -10,9 +10,11 @@ export class Projectiles {
   }
 
   spawn(o) {
-    const color = new THREE.Color(o.color).multiplyScalar(o.heavy ? 1 : 2.2);
-    const mesh = new THREE.Mesh(this.geo, new THREE.MeshBasicMaterial({ color, toneMapped: o.heavy }));
-    mesh.scale.set(o.size, o.size * (o.heavy ? 1 : 1.8), o.size);
+    // las flechas son finas, largas y no brillan; la magia y el hielo sí
+    const color = new THREE.Color(o.color).multiplyScalar(o.heavy || o.arrow ? 1 : 2.2);
+    const mat = o.arrow ? new THREE.MeshStandardMaterial({ color, roughness: 0.7 }) : new THREE.MeshBasicMaterial({ color, toneMapped: o.heavy });
+    const mesh = new THREE.Mesh(this.geo, mat);
+    mesh.scale.set(o.size, o.size * (o.heavy ? 1 : o.arrow ? 9 : 1.8), o.size);
     mesh.castShadow = true;
     mesh.position.set(o.x, o.y, o.z);
     this.game.scene.add(mesh);
@@ -46,7 +48,7 @@ export class Projectiles {
       p.mesh.rotation.y += dt * 8;
       p.mesh.lookAt(p.x + p.vx, p.y + p.vy * 0.2, p.z + p.vz);
       p.mesh.rotateX(Math.PI / 2);
-      if (Math.random() < 0.5) g.particles.spawn(p.x, p.y, p.z, { color: p.color, size: 0.4, life: 0.3, gravity: 0 });
+      if (!p.arrow && Math.random() < 0.5) g.particles.spawn(p.x, p.y, p.z, { color: p.color, size: 0.4, life: 0.3, gravity: 0 });
       const ground = zone.height(p.x, p.z);
       const hitWall = zone.collision.blocksView(p.x, p.z, p.y - ground);
       // impacto con el jugador
@@ -54,6 +56,7 @@ export class Projectiles {
       if (Math.hypot(pl.x - p.x, pl.z - p.z) < 0.7 + p.size && Math.abs(dy) < 1.4) {
         const r = pl.takeDamage(p.dmg, p.px - p.vx, p.pz - p.vz, p.heavy ? 10 : 5);
         if (r === 'hit' && p.freeze) pl.chill(p.freeze);
+        if (r === 'hit' && p.poison) pl.poison(p.poison);
         if (r !== 'ignored') { p.dead = true; this.burst(p); continue; }
       }
       if (p.heavy && p.y <= ground + 0.3) {

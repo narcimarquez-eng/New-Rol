@@ -38,8 +38,17 @@ export class Combat {
       if (e.def.flying && e.body.position.y > 2.6) continue; // demasiado alto
       if (!inArc(e.x, e.z, e.radius)) continue;
       p.hitSet.add(e);
-      e.hurt(dmg, p.x, p.z);
+      const res = e.hurt(dmg, p.x, p.z, { heavy: p.combo === 2 });
+      if (res === 'ignored') continue;
       const hx = (p.x + e.x) / 2, hz = (p.z + e.z) / 2;
+      if (res === 'blocked') {
+        // el escudo enemigo para el golpe: chispas y rebote (el remate del combo rompe la guardia)
+        g.particles.hit(hx, e.pos.y + 1.2, hz, 0xcfe8ff);
+        g.audio.sfx('block');
+        p.vel.set((p.x - e.x) * 2, (p.z - e.z) * 2);
+        g.hitstop(0.03);
+        continue;
+      }
       g.particles.hit(hx, e.pos.y + 1 + (e.flyY || 0) * 0.6, hz, p.swordGlow ? 0x9fe7ff : 0xfff2a8);
       g.audio.sfx('hit');
       g.hitstop(e.def.boss ? 0.06 : 0.045);

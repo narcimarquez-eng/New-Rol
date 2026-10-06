@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel.js';
 import { spart, smerge, charMat, addOutline, faceDecal, rockify } from '../gfx/ModelKit.js';
+import { KayKitModel } from './KayKitModel.js';
+import { REALISTIC } from '../gfx/Style.js';
 
 const lighten = (hex, l) => new THREE.Color(hex).offsetHSL(0, 0, l).getHex();
 
@@ -231,7 +233,66 @@ function golem(def) {
   return { root, body, mat, head, armL, armR, legs, core };
 }
 
-const BUILDERS = { slime, bat, plant, goblin, goblinKing: goblin, wolf, spirit, golem };
+/** Escorpión del desierto: caparazón segmentado, pinzas, ocho patas y cola articulada con aguijón. */
+function scorpion(def) {
+  const mat = REALISTIC ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.1 }) : charMat();
+  const c = def.color, dark = lighten(c, -0.12), light = lighten(c, 0.1);
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.42;
+  root.add(body);
+  const parts = [];
+  for (let i = 0; i < 4; i++) parts.push(spart(new THREE.SphereGeometry(0.34 - i * 0.02, 14, 10), i % 2 ? c : dark, { z: 0.35 - i * 0.28, sx: 1.25, sy: 0.55, ao: 0.3 }));
+  parts.push(spart(new THREE.SphereGeometry(0.26, 12, 10), light, { z: 0.62, y: 0.02, sx: 1.1, sy: 0.6, ao: 0.2 })); // cabeza
+  for (const sx of [-1, 1]) parts.push(spart(new THREE.SphereGeometry(0.035, 6, 5), 0x111111, { x: sx * 0.09, y: 0.13, z: 0.8, ao: 0 }));
+  body.add(mesh(smerge(parts), mat));
+  // pinzas
+  const claws = [];
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(sx * 0.32, 0.02, 0.7); arm.rotation.y = sx * 0.5;
+    arm.add(mesh(smerge([
+      spart(new THREE.CapsuleGeometry(0.06, 0.4, 4, 8), dark, { z: 0.22, rx: Math.PI / 2, ao: 0.1 }),
+      spart(new THREE.SphereGeometry(0.15, 10, 8), c, { z: 0.55, sx: 0.8, sy: 0.6, sz: 1.3, ao: 0.1 }),
+      spart(new THREE.ConeGeometry(0.06, 0.32, 6), dark, { x: sx * 0.05, z: 0.78, rx: Math.PI / 2, ao: 0 }),
+      spart(new THREE.ConeGeometry(0.05, 0.26, 6), light, { x: -sx * 0.06, z: 0.74, rx: Math.PI / 2, ao: 0 }),
+    ]), mat));
+    body.add(arm); claws.push(arm);
+  }
+  // patas
+  const legs = [];
+  for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) {
+    const leg = new THREE.Group(); leg.position.set(sx * 0.3, 0, 0.3 - i * 0.25);
+    leg.add(mesh(smerge([
+      spart(new THREE.CapsuleGeometry(0.035, 0.32, 4, 6), dark, { x: sx * 0.18, y: 0.05, rz: sx * 1.1, ao: 0 }),
+      spart(new THREE.CapsuleGeometry(0.03, 0.36, 4, 6), c, { x: sx * 0.42, y: -0.2, rz: -sx * 0.45, ao: 0 }),
+    ]), mat, 0.015));
+    leg.userData.sx = sx; leg.userData.i = i;
+    body.add(leg); legs.push(leg);
+  }
+  // cola: cinco segmentos encadenados que se curvan hacia delante, y el aguijón
+  const tail = []; let parent = body;
+  for (let i = 0; i < 5; i++) {
+    const seg = new THREE.Group();
+    seg.position.set(0, i === 0 ? 0.05 : 0.04, i === 0 ? -0.62 : -0.24);
+    seg.add(mesh(smerge([spart(new THREE.SphereGeometry(0.15 - i * 0.015, 10, 8), i % 2 ? dark : c, { z: -0.1, sz: 1.3, ao: 0.1 })]), mat));
+    parent.add(seg); tail.push(seg); parent = seg;
+  }
+  const sting = new THREE.Group(); sting.position.set(0, 0, -0.26);
+  sting.add(mesh(smerge([
+    spart(new THREE.SphereGeometry(0.13, 10, 8), 0xc85a2a, { ao: 0.1 }),
+    spart(new THREE.ConeGeometry(0.05, 0.3, 8), 0x1a1a1a, { z: 0.12, y: 0.1, rx: -0.9, ao: 0 }),
+  ]), mat));
+  parent.add(sting);
+  root.scale.setScalar(def.scale || 1.25);
+  return { root, body, mat, legs, claws, tail, sting };
+}
+
+/** Enemigos con modelo KayKit (esqueletos del desierto y su rey). */
+function kaykit(def) {
+  const kk = new KayKitModel(def.kaykit);
+  return { root: kk.root, body: kk.lean, mat: kk.materials[0], kk };
+}
+
+const BUILDERS = { slime, bat, plant, goblin, goblinKing: goblin, wolf, spirit, golem, scorpion, kaykit };
 
 export function buildEnemyModel(def) {
   const b = BUILDERS[def.model];

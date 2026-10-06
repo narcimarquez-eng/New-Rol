@@ -34,6 +34,24 @@ export class Audio {
     if (this.pendingMusic) this.playMusic(this.pendingMusic);
   }
 
+  /** Viento continuo (tormenta de arena): ruido filtrado cuyo volumen sigue a `level` (0..1). */
+  wind(level) {
+    if (!this.ctx) return;
+    if (!this.windSrc) {
+      if (level < 0.01) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuf; src.loop = true;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 500; f.Q.value = 0.6;
+      const gn = this.ctx.createGain(); gn.gain.value = 0;
+      src.connect(f); f.connect(gn); gn.connect(this.sfxGain);
+      src.start();
+      this.windSrc = src; this.windFilter = f; this.windGain = gn;
+    }
+    const t = this.ctx.currentTime;
+    this.windGain.gain.setTargetAtTime(level * 0.35, t, 0.3);
+    this.windFilter.frequency.setTargetAtTime(380 + level * 520 + Math.sin(t * 0.7) * 120, t, 0.4);
+  }
+
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.7;

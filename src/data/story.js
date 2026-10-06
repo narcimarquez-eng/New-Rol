@@ -18,6 +18,13 @@ export const STORY = [
   { until: { flag: 'boss_caves' }, text: 'Derrota al guardián de la caverna del norte.' },
   { until: { any: [{ has: 'key_fire' }, { flag: 'opened_c_north' }] }, text: 'Abre el gran cofre de la caverna.' },
   { until: { flag: 'opened_c_north' }, text: 'Derrite el muro de hielo del norte con la Llave de Fuego.' },
-  { until: { flag: 'phase2_complete' }, text: 'Cruza el paso del norte hacia el Desierto Perdido.' },
-  { until: null, text: '¡Fase 2 completada! El Desierto Perdido llegará pronto...' },
+  { until: { any: [{ flag: 'phase2_complete' }, { flag: 'entered_desert' }] }, text: 'Cruza el paso del norte hacia el Desierto Perdido.' },
+  // ---- Fase 3: Desierto Perdido ----
+  { until: { flag: 'met_aldric' }, text: 'Sigue el camino hacia el norte y habla con Sir Aldric, ante el Templo del Sol.' },
+  { until: { any: [{ has: 'key_sun' }, { flag: 'opened_d_temple' }] }, text: 'Busca la Llave del Sol en las ruinas del oeste.' },
+  { until: { flag: 'opened_d_temple' }, text: 'Abre la puerta del Templo del Sol con la Llave del Sol.' },
+  { until: { flag: 'boss_desert' }, text: 'Derrota al guardián del Templo del Sol.' },
+  { until: { any: [{ has: 'key_castle' }, { flag: 'phase3_complete' }] }, text: 'Abre el gran cofre del templo.' },
+  { until: { flag: 'phase3_complete' }, text: 'Cruza la salida norte del templo hacia el Castillo Final.' },
+  { until: null, text: '¡Fase 3 completada! El Castillo Final llegará pronto...' },
 ];

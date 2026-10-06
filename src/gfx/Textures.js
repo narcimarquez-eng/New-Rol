@@ -281,6 +281,128 @@ export function iceTextures() {
   });
 }
 
+// ------------------------------------------------------------------ desierto
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** Arena: ondulaciones del viento (crestas asimétricas) deformadas por ruido y grano fino. */
+export function sandTextures() {
+  return cached('sand', () => {
+    const size = 512;
+    const warp = fbmTile(size, rng(50), [[3, 0.6], [6, 0.4]]);
+    const warp2 = fbmTile(size, rng(51), [[8, 1]]);
+    const tone = fbmTile(size, rng(52), [[2, 0.5], [5, 0.3], [11, 0.2]]);
+    const grain = fbmTile(size, rng(53), [[128, 0.5], [256, 0.5]]);
+    return build(size, (x, y, i) => {
+      // onda de diente de sierra: ladera suave a barlovento y corte brusco a sotavento
+      const ph = (y / size) * 22 + (warp[i] - 0.5) * 7 + (warp2[i] - 0.5) * 1.2 + (x / size) * 2;
+      const f = ph - Math.floor(ph);
+      const ripple = f < 0.78 ? f / 0.78 : 1 - (f - 0.78) / 0.22;
+      const h = ripple * 0.9 + (grain[i] - 0.5) * 0.25 + tone[i] * 1.2;
+      const v = 0.86 + (tone[i] - 0.5) * 0.16 + (ripple - 0.5) * 0.06 + (grain[i] - 0.5) * 0.12;
+      return { r: clamp255(v * 236), g: clamp255(v * 200), b: clamp255(v * 148), h, rough: 0.92 };
+    }, { normalStrength: 1.6 });
+  });
+}
+
+/** Arenisca: estratos horizontales de tonos cálidos, erosión y poros. */
+export function sandstoneTextures() {
+  return cached('sandstone', () => {
+    const size = 512;
+    const warp = fbmTile(size, rng(54), [[4, 0.6], [8, 0.4]]);
+    const macro = fbmTile(size, rng(55), [[3, 0.5], [7, 0.3], [16, 0.2]]);
+    const grain = fbmTile(size, rng(56), [[96, 0.5], [256, 0.5]]);
+    const pits = fbmTile(size, rng(57), [[40, 1]]);
+    return build(size, (x, y, i) => {
+      const band = (y / size) * 9 + (warp[i] - 0.5) * 2.4;
+      const layer = Math.sin(band * Math.PI * 2) * 0.5 + 0.5;
+      const groove = smoothstep(0.92, 1, Math.abs(Math.sin(band * Math.PI))) * 0.6;
+      const pit = pits[i] > 0.78 ? (pits[i] - 0.78) * 3 : 0;
+      const h = macro[i] * 1.5 + layer * 0.5 - groove * 1.2 - pit * 1.2 + (grain[i] - 0.5) * 0.3;
+      const v = 0.78 + (macro[i] - 0.5) * 0.18 + (layer - 0.5) * 0.1 - groove * 0.14 - pit * 0.15 + (grain[i] - 0.5) * 0.1;
+      const warm = (layer - 0.5) * 0.06;
+      return { r: clamp255(v * 222 * (1 + warm)), g: clamp255(v * 176), b: clamp255(v * 128 * (1 - warm)), h, rough: 0.88 };
+    }, { normalStrength: 2.4 });
+  });
+}
+
+/** Losas de arenisca (suelo del templo): bloques rectangulares desgastados con juntas de arena. */
+export function flagstoneTextures() {
+  return cached('flagstone', () => {
+    const size = 512, rows = 4, r = rng(58);
+    const offs = Array.from({ length: rows }, () => r());
+    const cols = 3;
+    const tone = fbmTile(size, rng(59), [[4, 0.5], [9, 0.3], [20, 0.2]]);
+    const grain = fbmTile(size, rng(60), [[128, 0.6], [256, 0.4]]);
+    const cellRand = Array.from({ length: rows * cols * 2 }, () => r());
+    return build(size, (x, y, i) => {
+      const rowH = size / rows;
+      const row = Math.floor(y / rowH);
+      const colW = size / cols;
+      const xs = (x + offs[row] * colW) % size;
+      const col = Math.floor(xs / colW);
+      const ex = Math.min(xs - col * colW, (col + 1) * colW - xs), ey = Math.min(y - row * rowH, (row + 1) * rowH - y);
+      const e = Math.min(ex, ey);
+      const joint = 1 - smoothstep(2, 7 + tone[i] * 6, e);
+      const bevel = smoothstep(0, 14, e);
+      const cr = cellRand[row * cols + col];
+      const h = bevel * 1.2 - joint * 2 + (tone[i] - 0.5) * 0.8 + (grain[i] - 0.5) * 0.3;
+      let v = 0.8 + (cr - 0.5) * 0.12 + (tone[i] - 0.5) * 0.14 + (grain[i] - 0.5) * 0.08;
+      v = v * (1 - joint * 0.35);
+      return { r: clamp255(v * 226), g: clamp255(v * 186), b: clamp255(v * 140), h, rough: 0.8 + joint * 0.15 };
+    }, { normalStrength: 1.4 });
+  });
+}
+
+/** Tierra agrietada por la sequía (placas de Voronoi con bordes levantados). */
+export function clayTextures() {
+  return cached('clay', () => {
+    const size = 512;
+    const wx = fbmTile(size, rng(61), [[4, 0.6], [8, 0.4]]), wy = fbmTile(size, rng(62), [[4, 0.6], [8, 0.4]]);
+    for (let i = 0; i < wx.length; i++) { wx[i] = (wx[i] - 0.5) * 30; wy[i] = (wy[i] - 0.5) * 30; }
+    const cells = voronoiTile(size, 9, rng(63), { warpX: wx, warpY: wy });
+    const tone = fbmTile(size, rng(64), [[3, 0.6], [9, 0.4]]);
+    const grain = fbmTile(size, rng(65), [[128, 1]]);
+    return build(size, (x, y, i) => {
+      const crack = 1 - smoothstep(0.5, 3.5, cells.edge[i]);
+      const curl = smoothstep(3, 16, cells.edge[i]); // los bordes de cada placa se levantan un poco
+      const h = (1 - curl) * 0.6 - crack * 2.5 + (grain[i] - 0.5) * 0.2;
+      const v = 0.72 + (tone[i] - 0.5) * 0.16 + (grain[i] - 0.5) * 0.08 - crack * 0.35 + (1 - curl) * 0.05;
+      return { r: clamp255(v * 214), g: clamp255(v * 168), b: clamp255(v * 124), h, rough: 0.95 };
+    }, { normalStrength: 1.8 });
+  });
+}
+
+/** Hoja de palmera: nervio central y foliolos finos, con transparencia. */
+export function palmFrondTexture() {
+  return cached('palmfrond', () => {
+    const W = 128, H = 512, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    const r = rng(66);
+    // foliolos: trazos finos que salen del nervio hacia los lados, más cortos hacia la punta
+    for (let k = 0; k < 120; k++) {
+      const t = k / 120;
+      const y = H * (0.04 + t * 0.94);
+      const len = W * 0.48 * Math.sin(Math.min(1, t * 1.15) * Math.PI) * (0.85 + r() * 0.2);
+      for (const sx of [-1, 1]) {
+        const g = 90 + r() * 50;
+        c.strokeStyle = `rgb(${50 + r() * 30},${g},${30 + r() * 20})`;
+        c.lineWidth = 2.2 + r();
+        c.beginPath();
+        c.moveTo(W / 2, y);
+        c.quadraticCurveTo(W / 2 + sx * len * 0.5, y - 10, W / 2 + sx * len, y - 18 - r() * 10);
+        c.stroke();
+      }
+    }
+    c.strokeStyle = '#8a8a4a'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke();
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    return t;
+  });
+}
+
 /** Nieve: casi blanca con ondulaciones suaves y brillos. */
 export function snowTextures() {
   return cached('snow', () => {

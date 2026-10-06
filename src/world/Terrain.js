@@ -8,7 +8,7 @@ import { REALISTIC } from '../gfx/Style.js';
 import { terrainMaterial } from '../gfx/Materials.js';
 
 // capa de textura del terreno realista por tipo de suelo: césped, tierra, piedra, nieve
-const LAYER = { grass: 0, forest: 0, path: 1, sand: 1, water: 1, stone: 2, snow: 3, ice: 3 };
+const LAYER = { grass: 0, forest: 0, path: 1, sand: 1, water: 1, stone: 2, flagstone: 2, snow: 3, ice: 3, clay: 3 };
 
 const SUB = 2; // vértices por casilla (resolución)
 
@@ -23,6 +23,7 @@ export class Terrain {
     this.heights = new Float32Array(this.VW * this.VH);
     const amp = zone.data.terrain?.amplitude ?? 0.8;
     const seed = zone.data.terrain?.seed ?? 1;
+    const dunes = zone.data.terrain?.dunes || 0; // altura de las dunas (solo sobre arena)
 
     for (let j = 0; j < this.VH; j++) {
       for (let i = 0; i < this.VW; i++) {
@@ -31,6 +32,17 @@ export class Terrain {
         // fracción de agua alrededor del vértice -> orillas inclinadas
         const wf = this.waterFraction(i, j);
         h = h * (1 - wf) - wf * 1.6;
+        if (dunes) {
+          // crestas asimétricas (suaves a barlovento, empinadas a sotavento) deformadas por ruido
+          const sf = this.groundFraction(i, j, 'sand');
+          if (sf > 0) {
+            const wx = x + (fbm(x * 0.02, z * 0.02, seed + 5, 2) - 0.5) * 40;
+            const ph = (wx * 0.55 + z) * 0.045;
+            const f = ph - Math.floor(ph);
+            const r = f < 0.7 ? f / 0.7 : 1 - (f - 0.7) / 0.3;
+            h += r * r * (3 - 2 * r) * dunes * sf * (0.5 + fbm(x * 0.03, z * 0.03, seed + 9, 2) * 0.9);
+          }
+        }
         this.heights[j * this.VW + i] = h;
       }
     }
@@ -48,6 +60,16 @@ export class Terrain {
       const t = tileInfo(this.zone.charAt(c, r));
       if (t.water) w++;
     }
+    return n ? w / n : 0;
+  }
+
+  /** Fracción de las casillas que tocan el vértice (i,j) con un tipo de suelo dado. */
+  groundFraction(i, j, ground) {
+    const cs = [], rs = [];
+    if (i % SUB === 0) { cs.push(i / SUB - 1, i / SUB); } else cs.push(Math.floor(i / SUB));
+    if (j % SUB === 0) { rs.push(j / SUB - 1, j / SUB); } else rs.push(Math.floor(j / SUB));
+    let w = 0, n = 0;
+    for (const r of rs) for (const c of cs) { n++; if (tileInfo(this.zone.charAt(c, r)).ground === ground) w++; }
     return n ? w / n : 0;
   }
 
@@ -132,7 +154,7 @@ export class Terrain {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     if (REALISTIC) {
-      const mesh = new THREE.Mesh(geo, terrainMaterial());
+      const mesh = new THREE.Mesh(geo, terrainMaterial(this.zone.data.terrain?.variant));
       mesh.receiveShadow = true;
       mesh.name = 'terrain';
       return mesh;

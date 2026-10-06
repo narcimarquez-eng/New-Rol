@@ -145,10 +145,13 @@ try {
   const cameraReport = () => page.evaluate(() => {
     const g = window.__game, z = g.zone, col = z.collision;
     let bad = 0, n = 0;
+    // casillas que activan un portal: el jugador nunca se queda ahí (cambia de zona al instante)
+    const portals = g.interactables.filter((it) => it.constructor.name === 'Portal' || it.data?.type === 'portal');
+    const onPortal = (x, zz) => portals.some((pt) => Math.abs(x - pt.x) < pt.width / 2 + 0.6 && Math.abs(zz - pt.z) < 2.8);
     for (let i = 0; i < 150; i++) {
       const c = Math.floor(Math.random() * z.W), r = Math.floor(Math.random() * z.H);
       const [x, zz] = z.tileToWorld(c, r);
-      if (col.blocked(x, zz, 0.6)) continue;
+      if (col.blocked(x, zz, 0.6) || onPortal(x, zz)) continue;
       g.player.place(x, zz, Math.random() * 6.28);
       g.cam.yaw = Math.random() * 6.28; g.cam.pitch = Math.random() * 1.2 - 0.1;
       g.cam.curDistance = 0.8;
@@ -363,12 +366,6 @@ try {
   ok(await waitTrue(page, () => window.__game.progress.has('key_fire')), 'el gran cofre da la Llave de Fuego');
   await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(22.5, 1.78, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(3); });
   ok(await page.evaluate(() => window.__game.progress.flags.has('opened_c_north')), 'la Llave de Fuego derrite el muro de hielo');
-  await page.evaluate(() => { window.__t.tp(22.5, 0.2, Math.PI); window.__t.sim(0.4); });
-  ok(await page.evaluate(() => window.__game.progress.flags.has('phase2_complete')), 'el paso del norte completa la Fase 2');
-  ok(await page.evaluate(() => /Fase 2/.test(document.querySelector('#ending h1').textContent)), 'se muestra la pantalla de fin de la Fase 2');
-  await page.screenshot({ path: `${OUT}/15-ending.png` });
-  await page.evaluate(() => { document.getElementById('btn-keep').click(); });
-
   // --- misión de entrega: la sopa de Olaf para Sven ---
   const soup = await page.evaluate(() => {
     const g = window.__game;
@@ -379,6 +376,224 @@ try {
     return [got, g.progress.questState('q_soup')];
   });
   ok(soup[0] && soup[1] === 'done', `misión "Sopa caliente": aceptar, entregar y completar (${soup})`);
+
+  // ======================= FASE 3: DESIERTO PERDIDO =======================
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(22.5, 0.2, Math.PI); window.__t.sim(0.4); });
+  ok(await waitTrue(page, () => window.__game.zone.id === 'desert' && !window.__game.transitioning, 30000), 'el paso del norte lleva al Desierto Perdido');
+  ok(await page.evaluate(() => window.__game.progress.flags.has('entered_desert')), 'se registra la llegada al desierto');
+  await page.evaluate(() => window.__t.sim(0.5));
+  await page.screenshot({ path: `${OUT}/16-desert.png` });
+
+  // helpers del desierto
+  await page.evaluate(() => {
+    const g = window.__game;
+    window.__t.talk = (id) => { const n = g.interactables.find((i) => i.id === id); if (!n) return false; g.talkTo(n); for (let k = 0; k < 30 && g.ui.dialog; k++) { g.ui.advanceDialog(); g.ui.advanceDialog(); } g.mode = 'play'; return true; };
+    window.__t.enemies = (kind) => g.enemies.filter((e) => e.kind === kind && e.alive);
+    window.__t.spawnNear = (kind, dx, dz) => { const p = g.player; const c = (p.x + dx + g.zone.W * 2) / 4 - 0.5, r = (p.z + dz + g.zone.H * 2) / 4 - 0.5; return g.spawnEnemy({ kind, tile: [c, r] }); };
+  });
+
+  // --- Kael se une al grupo y sigue al héroe ---
+  const kael = await page.evaluate(() => {
+    const g = window.__game;
+    const had = g.interactables.some((i) => i.id === 'kael');
+    window.__t.talk('kael');
+    window.__t.sim(0.3);
+    return { had, comp: g.companions.map((c) => c.id), npcGone: !g.interactables.some((i) => i.id === 'kael' && !i.removed) };
+  });
+  ok(kael.had && kael.comp.includes('kael') && kael.npcGone, `Kael el Encapuchado se une al grupo (${kael.comp})`);
+  const follow = await page.evaluate(() => {
+    const g = window.__game;
+    window.__t.tp(23.5, 36, Math.PI);
+    window.__t.sim(4);
+    const c = g.companions[0];
+    return Math.hypot(c.x - g.player.x, c.z - g.player.z);
+  });
+  ok(follow < 6, `el compañero sigue al héroe (a ${follow.toFixed(1)} u)`);
+
+  // --- el compañero lucha solo contra un enemigo cercano ---
+  const helps = await page.evaluate(() => {
+    const g = window.__game;
+    g.godMode = true;
+    window.__t.tp(23.5, 38, Math.PI);
+    const e = window.__t.spawnNear('scorpion', 3, -3);
+    const hp0 = e.hp;
+    window.__t.sim(8);
+    g.godMode = false;
+    return { hit: !e.alive || e.hp < hp0, state: g.companions[0].state };
+  });
+  ok(helps.hit, 'el compañero ataca a los enemigos sin ayuda del héroe');
+
+  // --- esqueleto enterrado: se levanta al acercarse (invulnerable mientras tanto) ---
+  const awake = await page.evaluate(() => {
+    const g = window.__game;
+    const e = window.__t.enemies('skeletonMinion').find((m) => m.dormant);
+    if (!e) return null;
+    const s0 = e.state;
+    g.player.place(e.x + 4, e.z, 0);
+    window.__t.sim(0.2);
+    const s1 = e.state;
+    const ign = e.hurt(5, g.player.x, g.player.z);
+    window.__t.sim(2.2);
+    return { s0, s1, ign, s2: e.state, alive: e.alive };
+  });
+  ok(awake && awake.s0 === 'dormant' && awake.s1 === 'awaken' && awake.ign === 'ignored' && awake.alive, `un esqueleto enterrado despierta al acercarse (${JSON.stringify(awake)})`);
+
+  // --- escudo del guerrero: para golpes de frente, el remate del combo rompe la guardia ---
+  const shield = await page.evaluate(() => {
+    const g = window.__game;
+    const e = window.__t.spawnNear('skeletonWarrior', 0, -3);
+    e.state = 'chase'; e.facing = Math.atan2(g.player.x - e.x, g.player.z - e.z);
+    const rnd = Math.random; Math.random = () => 0;
+    const a = e.hurt(1, g.player.x, g.player.z);
+    e.state = 'chase';
+    const b = e.hurt(1, g.player.x, g.player.z, { heavy: true });
+    Math.random = rnd;
+    e.die();
+    return [a, b];
+  });
+  ok(shield[0] === 'blocked' && shield[1] === 'hit', `el escudo del esqueleto para golpes de frente y el remate lo rompe (${shield})`);
+
+  // --- veneno del escorpión: quita vida poco a poco sin matar; la poción lo cura ---
+  const poison = await page.evaluate(() => {
+    const g = window.__game, p = g.player;
+    g.godMode = true; // que ningún enemigo cercano reste vida durante la medida
+    p.hp = p.maxHp; p.invuln = 0;
+    p.poison(3.2);
+    window.__t.sim(3.3);
+    const lost = p.maxHp - p.hp;
+    g.godMode = false;
+    p.poison(5); g.progress.add('potion', 1);
+    g.usePotion();
+    return { lost, cured: !(p.poisonT > 0) };
+  });
+  ok(poison.lost === 2 && poison.cured, `el veneno resta vida con el tiempo y la poción lo cura (${JSON.stringify(poison)})`);
+
+  // --- ballestero: dispara flechas desde lejos ---
+  const arrows = await page.evaluate(() => {
+    const g = window.__game;
+    g.godMode = true;
+    window.__t.tp(23.5, 38, Math.PI);
+    const e = window.__t.spawnNear('skeletonArcher', 0, -9);
+    let saw = false;
+    for (let i = 0; i < 60 * 8 && !saw; i++) { window.__t.sim(1 / 60); saw = g.projectiles.list.some((p) => p.arrow && !p.dead); }
+    e.die();
+    g.godMode = false;
+    return saw;
+  });
+  ok(arrows, 'los esqueletos ballesteros disparan flechas');
+
+  // --- tormenta de arena ---
+  const storm = await page.evaluate(() => {
+    const g = window.__game;
+    const d0 = g.scene.fog.density ?? g.scene.fog.far;
+    g.storm.start();
+    window.__t.sim(4);
+    const d1 = g.scene.fog.density ?? g.scene.fog.far;
+    const lvl = g.storm.level;
+    // los enemigos ven menos durante la tormenta
+    const e = window.__t.spawnNear('scorpion', 0, -8.5);
+    const sees = e.canSee(g.player);
+    e.die();
+    g.storm.level = 0; g.storm.t = -60; g.storm.apply();
+    return { lvl, thicker: g.scene.fog.isFogExp2 ? d1 > d0 * 3 : d1 < d0, sees };
+  });
+  ok(storm.lvl > 0.6 && storm.thicker && !storm.sees, `la tormenta de arena espesa la niebla y reduce la vista de los enemigos (${JSON.stringify(storm)})`);
+
+  // --- mapa del desierto: colisiones y cámara ---
+  const desertCol = await collisionReport();
+  ok(desertCol.inside === 0, `Desierto: ${desertCol.tests} pasos sin atravesar paredes (${desertCol.inside} fallos)`);
+  const camD = await cameraReport();
+  ok(camD.bad === 0, `Desierto: cámara correcta en ${camD.n} posiciones (${camD.bad} fallos)`);
+
+  // --- historia: Sir Aldric, la Llave del Sol y la puerta del templo ---
+  await page.evaluate(() => window.__t.talk('aldric'));
+  ok(await page.evaluate(() => window.__game.progress.flags.has('met_aldric')), 'Sir Aldric cuenta dónde está la Llave del Sol');
+  const locked = await page.evaluate(() => {
+    const g = window.__game;
+    window.__t.tp(23.5, 16.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.3);
+    const open = g.progress.flags.has('opened_d_temple');
+    if (g.ui.dialog) g.ui.closeDialog();
+    g.mode = 'play';
+    return open;
+  });
+  ok(!locked, 'la puerta del templo no se abre sin la Llave del Sol');
+  await page.evaluate(() => { const g = window.__game; g.godMode = true; window.__t.tp(6.5, 12.6, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.6); });
+  ok(await waitTrue(page, () => window.__game.progress.has('key_sun')), 'el cofre de las ruinas da la Llave del Sol');
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(23.5, 16.85, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(2.5); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('opened_d_temple')), 'la Llave del Sol abre la puerta del Templo del Sol');
+
+  // --- Rey de las Arenas (2 fases, invoca esqueletos de la arena) ---
+  await page.evaluate(() => { window.__t.tp(24, 13, Math.PI); window.__t.sim(0.5); });
+  await page.screenshot({ path: `${OUT}/17-sand-king.png` });
+  const king = await page.evaluate(() => {
+    const g = window.__game;
+    g.godMode = true;
+    let sawPhase2 = false, sawRise = false;
+    for (let i = 0; i < 60 * 80; i++) {
+      const b = g.enemies.find((e) => e.def.boss);
+      if (!b) break;
+      if (b.phase === 2) sawPhase2 = true;
+      if (g.enemies.some((e) => e.state === 'awaken')) sawRise = true;
+      // los súbditos invocados también caen
+      for (const m of g.enemies) if (!m.def.boss && m.alive && m.state !== 'awaken' && Math.random() < 0.01) m.die();
+      const d = Math.hypot(b.x - g.player.x, b.z - g.player.z);
+      if (d > 3.8) { const a = Math.atan2(g.player.x - b.x, g.player.z - b.z); g.player.pos.x = b.x + Math.sin(a) * 3.6; g.player.pos.z = b.z + Math.cos(a) * 3.6; g.zone.collision.resolve(g.player.pos, 0.5); }
+      if (i % 10 === 0) g.input.press('attack');
+      g.noRender = true; g.step(1 / 60); g.noRender = false; g.input.endFrame();
+    }
+    return { dead: !g.enemies.some((e) => e.def.boss), sawPhase2, sawRise };
+  });
+  ok(king.dead, 'el Rey de las Arenas puede ser derrotado');
+  ok(king.sawPhase2 && king.sawRise, `el Rey de las Arenas entra en su segunda fase y levanta esqueletos (${JSON.stringify(king)})`);
+  await page.evaluate(() => window.__t.sim(1));
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(24, 4.1, Math.PI); window.__t.sim(0.3); g.input.press('interact'); window.__t.sim(0.5); });
+  ok(await waitTrue(page, () => window.__game.progress.has('key_castle')), 'el gran cofre del templo da la Llave del Castillo');
+
+  // --- misiones secundarias del desierto ---
+  const quests3 = await page.evaluate(() => {
+    const g = window.__game, pr = g.progress, t = window.__t;
+    g.mode = 'play'; g.ui.show('itemget', false);
+    const res = {};
+    // Borg: 4 esqueletos enterrados -> se une al grupo
+    t.tp(14.5, 30.6, Math.PI); t.talk('borg');
+    for (let k = 0; k < 4; k++) { const e = t.spawnNear('skeletonMinion', 30, 0); e.die(); }
+    res.borgReady = pr.questState('q_borg');
+    t.talk('borg');
+    res.borg = pr.questState('q_borg');
+    // Zahir: 5 escorpiones
+    t.tp(20.5, 29.6, Math.PI); t.talk('zahra');
+    for (let k = 0; k < 5; k++) { const e = t.spawnNear('scorpion', 30, 0); e.die(); }
+    t.talk('zahra');
+    res.scorp = pr.questState('q_scorpions');
+    // Cedric: el amuleto está tras un muro falso de las ruinas
+    t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
+    const [wx, wz] = g.zone.tileToWorld(6, 20);
+    res.secretPassable = !g.zone.collision.blocked(wx, wz, 0.5);
+    t.tp(5.1, 20, -Math.PI / 2); t.sim(0.3); g.input.press('interact'); t.sim(0.5);
+    g.mode = 'play'; g.ui.show('itemget', false);
+    t.tp(32.6, 22.4, Math.PI); t.talk('cedric');
+    res.amulet = pr.questState('q_amulet');
+    // Aldric: 3 fragmentos solares
+    t.tp(21.5, 19.8, Math.PI); t.talk('aldric');
+    for (const [c, r] of [[38, 12], [3, 42], [35, 47]]) { t.tp(c, r, 0); t.sim(0.4); }
+    t.tp(21.5, 19.8, Math.PI); t.talk('aldric');
+    res.shards = pr.questState('q_shards');
+    return res;
+  });
+  ok(quests3.borgReady === 'ready' && quests3.borg === 'done', `misión "Huesos en la arena" (${quests3.borgReady}, ${quests3.borg})`);
+  ok(await waitTrue(page, () => window.__game.companions.some((c) => c.id === 'borg')), 'Borg el Bárbaro se une al grupo al completar su misión');
+  ok(quests3.scorp === 'done', `misión "Plaga de escorpiones" (${quests3.scorp})`);
+  ok(quests3.secretPassable && quests3.amulet === 'done', `misión "El amuleto de la familia" con el pasadizo secreto (${quests3.secretPassable}, ${quests3.amulet})`);
+  ok(quests3.shards === 'done', `misión "Fragmentos de sol" (${quests3.shards})`);
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; window.__t.tp(23.5, 12, Math.PI); window.__t.sim(1); });
+  await page.screenshot({ path: `${OUT}/18-party.png` });
+
+  // --- salida norte: fin de la Fase 3 ---
+  await page.evaluate(() => { const g = window.__game; g.mode = 'play'; g.ui.show('itemget', false); window.__t.tp(23.5, 0.2, Math.PI); window.__t.sim(0.4); });
+  ok(await page.evaluate(() => window.__game.progress.flags.has('phase3_complete')), 'la salida norte del templo completa la Fase 3');
+  ok(await page.evaluate(() => /Fase 3/.test(document.querySelector('#ending h1').textContent)), 'se muestra la pantalla de fin de la Fase 3');
+  await page.screenshot({ path: `${OUT}/19-ending.png` });
+  await page.evaluate(() => { document.getElementById('btn-keep').click(); });
 
   // ---------- guardado ----------
   const saved = await page.evaluate(() => { window.__game.save(); return !!localStorage.getItem('newrol.save.v1'); });

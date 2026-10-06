@@ -2,6 +2,8 @@
 // objetos recogibles, muñecos de entrenamiento y portales entre zonas.
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel.js';
+import { KayKitModel } from './KayKitModel.js';
+import { charactersReady } from '../gfx/Characters.js';
 import * as P from '../world/Props.js';
 import { ITEMS } from '../data/items.js';
 import { TILE } from '../world/tiles.js';
@@ -78,6 +80,7 @@ export class NPC extends Base {
     this.mapColor = '#5ad1ff';
     if (data.look === 'cat') { this.model = null; this.mesh = catModel(); this.radius = 2.0; }
     else if (data.look === 'fairy') { this.model = null; this.mesh = fairyModel(); this.fairy = true; this.mapColor = '#bff8ff'; }
+    else if (data.kaykit && charactersReady()) { this.model = new KayKitModel(data.kaykit); this.mesh = this.model.root; this.kk = true; }
     else { this.model = new CharacterModel(data.look || {}); this.mesh = this.model.root; }
     if (data.look === 'cat') outlineAll(this.mesh, 0.025);
     this.root.add(this.mesh);
@@ -101,6 +104,11 @@ export class NPC extends Base {
   }
 
   get prompt() { return `Hablar con ${this.name}`; }
+
+  dispose() {
+    // los modelos KayKit comparten geometría con la biblioteca: no se libera
+    if (this.kk) { this.model.dispose(); this.mark.geometry.dispose(); } else super.dispose();
+  }
 
   interact() { this.game.talkTo(this); }
 
@@ -137,7 +145,12 @@ export class NPC extends Base {
     this.y = g.zone.height(this.x, this.z);
     this.root.position.set(this.x, this.y, this.z);
     this.root.rotation.y = this.facing;
-    if (this.model) this.model.animate(dt, { speed, talk: this.talking });
+    if (this.kk) {
+      // los personajes KayKit miran al héroe cuando está cerca
+      const near = Math.hypot(p.x - this.x, p.z - this.z) < 7;
+      this.model.lookTarget = near ? (this._lp || (this._lp = new THREE.Vector3())).set(p.x, p.pos.y + 1.5, p.z) : null;
+    }
+    if (this.model) this.model.animate(dt, { speed, talk: this.talking, action: this.data.pose && !this.talking ? { name: this.data.pose, loop: true } : null });
     if (this.fairy) {
       const ud = this.mesh.userData;
       ud.body.position.y = 1.8 + Math.sin(t * 2) * 0.25;
@@ -148,7 +161,7 @@ export class NPC extends Base {
     // marca de misión
     const has = g.npcHasNews(this);
     this.mark.visible = has;
-    if (has) { this.mark.rotation.y = t * 2; this.mark.position.y = (this.model ? 3.0 * (this.model.cfg.scale || 1) : 2.2) + Math.sin(t * 4) * 0.1; }
+    if (has) { this.mark.rotation.y = t * 2; this.mark.position.y = (this.kk ? (this.data.kaykit.height ?? 1.85) + 0.75 : this.model ? 3.0 * (this.model.cfg.scale || 1) : 2.2) + Math.sin(t * 4) * 0.1; }
   }
 }
 
@@ -399,6 +412,13 @@ export class Portal extends Base {
     const cd = Math.hypot(g.camera.position.x - this.x, g.camera.position.z - this.z);
     this.mesh.userData.glow.material.opacity = (0.18 + Math.sin(g.time * 3) * 0.08) * THREE.MathUtils.smoothstep(cd, 3, 9);
     if (Math.abs(p.x - this.x) < this.width / 2 && Math.abs(p.z - this.z) < 2.2 && g.mode === 'play' && !g.transitioning) {
+      // portal sellado: hace falta un objeto o una bandera (p. ej. la Llave del Castillo)
+      if (this.data.requires && !g.progress.check(this.data.requires)) {
+        const away = Math.sign(p.z - this.z) || 1;
+        p.pos.z = this.z + away * 2.6;
+        if (!this.warnT || g.time - this.warnT > 2.5) { this.warnT = g.time; g.ui.toast(this.data.lockedText || 'El paso está sellado.'); g.audio.sfx('locked'); }
+        return;
+      }
       g.usePortal(this.data);
     }
   }

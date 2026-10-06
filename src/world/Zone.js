@@ -6,6 +6,7 @@ import { TILE, tileInfo } from './tiles.js';
 import { Terrain } from './Terrain.js';
 import { Collision } from './Collision.js';
 import * as P from './Props.js';
+import * as D from './DesertProps.js';
 import { buildSky, buildClouds, buildMountains, buildWater } from './Sky.js';
 import { rng, hash2 } from '../core/utils.js';
 import { buildGrass } from './Grass.js';
@@ -15,6 +16,7 @@ import { buildAtmosphere, buildRealWater } from '../gfx/Environment.js';
 import { buildBackdrop } from '../gfx/Backdrop.js';
 import { treeInstances, variedTrees, barkMat, endGrainMat } from '../gfx/Vegetation.js';
 import { triplanar, rockTextures, woodTextures, snowTextures, iceMaterialReal } from '../gfx/Materials.js';
+import { sandTextures } from '../gfx/Textures.js';
 import { tex } from '../gfx/Textures.js';
 
 let iceMat = null;
@@ -138,7 +140,7 @@ export class Zone {
   /** Recorre el mapa y genera las mallas instanciadas por tipo de objeto. */
   buildTiles() {
     const pal = this.palette;
-    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [] };
+    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [], ruin: [], column: [], cactus: [], palm: [], scrub: [] };
     const rockWalls = this.data.wallStyle === 'rock';
     const r = rng(this.data.terrain?.seed ?? 1);
     this.bushIndex = new Map(); // "c,r" -> índice de instancia
@@ -183,6 +185,10 @@ export class Zone {
           case 'bridge': lists.bridge.push({ x, y: -0.35, z, ry: 0 }); break;
           case 'crystal': lists.crystal.push({ x: x + jx * 0.5, y, z: z + jz * 0.5, ry: rot, s: sc }); this.torches.push({ x, z, y: y + 1.4, phase: rot, color: this.palette.crystalLight ?? 0x7fd8ff, crystal: true, obj: { userData: {} } }); break;
           case 'iceSheet': break;
+          case 'ruin': lists.ruin.push({ x, z, y, c, r: row, secret: info.secret }); break;
+          case 'column': lists.column.push({ x, y: y - 0.1, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, broken: hash2(c, row, 6) < 0.35 }); break;
+          case 'cactus': lists.cactus.push({ x: x + jx, y: y - 0.1, z: z + jz, ry: rot, s: sc }); break;
+          case 'palm': lists.palm.push({ x: x + jx * 0.6, y: y - 0.1, z: z + jz * 0.6, ry: rot, s: 0.9 + hash2(c, row, 4) * 0.25 }); break;
           case 'icepillar': lists.icepillar.push({ x, y: y - 0.1, z, ry: Math.floor(hash2(c, row, 5) * 4) * Math.PI / 2, sy: 0.9 + hash2(c, row, 6) * 0.3 }); break;
           default: break;
         }
@@ -190,6 +196,8 @@ export class Zone {
         if (occ) continue;
         if (info.decor === 'flowers') {
           for (let k = 0; k < 6; k++) lists.flowers.push({ x: x + (r() - 0.5) * 3.6, y, z: z + (r() - 0.5) * 3.6, s: 0.8 + r() * 0.6, color: flowerColors[Math.floor(r() * flowerColors.length)] });
+        } else if (info.decor === 'scrub') {
+          for (let k = 0; k < 2; k++) lists.scrub.push({ x: x + (r() - 0.5) * 3.2, y, z: z + (r() - 0.5) * 3.2, ry: r() * 6, s: 0.6 + r() * 0.5 });
         } else if (info.decor === 'tallgrass') {
           for (let k = 0; k < 7; k++) lists.tufts.push({ x: x + (r() - 0.5) * 3.6, y, z: z + (r() - 0.5) * 3.6, ry: r() * 6, s: 0.8 + r() * 0.8 });
         } else if (info.ground === 'grass' || info.ground === 'forest') {
@@ -209,6 +217,12 @@ export class Zone {
       if (high && opt.outline) { const o = instancedOutline(m, opt.outline, opt.wind || null); if (o) this.group.add(o); }
       return m;
     };
+    // objetos del desierto (mismos modelos en los dos estilos)
+    if (lists.ruin.length) this.group.add(D.ruinWalls(lists.ruin));
+    if (lists.column.length) this.group.add(D.columns(lists.column));
+    if (lists.cactus.length) this.group.add(D.cacti(lists.cactus));
+    if (lists.palm.length) this.group.add(D.palms(lists.palm));
+    if (lists.scrub.length) this.group.add(treeInstances('scrub', lists.scrub, { seed: 1, castShadow: false }));
     if (REALISTIC) { this.buildRealProps(lists, add); return; }
     const tm = P.toonMat();
     const treeWind = { from: 2.2, amount: 0.05 };
@@ -247,9 +261,11 @@ export class Zone {
   buildRealProps(lists, add) {
     const pal = this.palette;
     const caves = this.data.wallStyle === 'rock';
-    const topCover = caves
-      ? { set: snowTextures(), color: 0xffffff, from: 0.55 }
-      : { set: { map: tex('tex/grass.jpg'), normalMap: rockTextures().normalMap }, color: pal.groundReal?.grass ?? 0x7d9a4a, from: 0.6 };
+    const topCover = this.data.cliffTop === 'sand'
+      ? { set: sandTextures(), color: pal.groundReal?.sand ?? 0xe4c48e, from: 0.6 }
+      : caves
+        ? { set: snowTextures(), color: 0xffffff, from: 0.55 }
+        : { set: { map: tex('tex/grass.jpg'), normalMap: rockTextures().normalMap }, color: pal.groundReal?.grass ?? 0x7d9a4a, from: 0.6 };
     const rockMat = triplanar({ key: `rock-${this.id}`, set: rockTextures(), scale: 0.3, normalStrength: 1, vertexColors: false, color: pal.rockReal ?? 0xa09a90, top: topCover });
     const woodMat = triplanar({ key: 'wood-real', set: woodTextures(), scale: 0.5, normalStrength: 0.6, vertexColors: true });
 
@@ -361,6 +377,8 @@ export class Zone {
             P.part(new THREE.BoxGeometry(1.1, 0.35, 0.5), 0x444444, { y: 0.75 }),
           ]), P.toonMat()); break;
           case 'campfire': obj = this.buildCampfire(); break;
+          case 'tent': obj = D.tent(e.color); break;
+          case 'jar': obj = D.jar(); break;
           case 'log':
             if (REALISTIC) { obj = new THREE.Group(); const l = P.logReal(2.2, 0.35); l.position.y = 0.33; obj.add(l); break; }
             obj = new THREE.Mesh(P.part(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 7), pal.trunk, { rz: Math.PI / 2, y: 0.35 }), P.toonMat()); break;
