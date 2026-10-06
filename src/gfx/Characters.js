@@ -80,7 +80,7 @@ export function instantiate(def) {
   const scene = skClone(src);
   const show = new Set(def.show || []);
   // accesorios: todo lo que no es parte del cuerpo
-  const BODY = /(ArmLeft|ArmRight|Body|Head|Skull|LegLeft|LegRight|Eyes|Jaw)$/;
+  const BODY = /(ArmLeft|ArmRight|Body|Head|Head_Hooded|Skull|LegLeft|LegRight|Eyes|Jaw)$/;
   scene.traverse((o) => { if ((o.isMesh || o.isSkinnedMesh) && !BODY.test(o.name) && !show.has(o.name)) o.visible = false; });
   // armas de otro modelo: son mallas con piel, se vuelven a enlazar a los huesos de éste (mismos nombres)
   for (const [, [model, node]] of Object.entries(def.borrow || {})) {

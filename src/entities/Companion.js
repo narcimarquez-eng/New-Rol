@@ -1,13 +1,25 @@
-// Compañero que acompaña al héroe: le sigue a un lado y un poco detrás, y
-// cuando hay enemigos cerca del héroe se lanza a por ellos con sus propias
-// animaciones de ataque. Los enemigos siguen centrados en el héroe, así que los
+// Compañero que acompaña al héroe: se queda cerca de él sin estorbar (solo se
+// pone en marcha cuando el héroe se aleja, así no da vueltas a su alrededor
+// cada vez que éste gira) y cuando hay enemigos cerca del héroe se lanza a por
+// ellos con sus propias animaciones de ataque. Los enemigos siguen centrados en el héroe, así que los
 // compañeros no pueden caer: son apoyo, no una segunda vida.
 import * as THREE from 'three';
 import { KayKitModel } from './KayKitModel.js';
 import { COMPANIONS } from '../data/companions.js';
-import { dampAngle } from '../core/utils.js';
 
 const RADIUS = 0.45;
+// distancias al héroe para seguirle: si se aleja más de FAR, camina hasta quedar
+// a STOP; más cerca se queda quieto (si el héroe se le echa encima, se aparta sin girarse)
+const STOP = 2.6, FAR = 4.4;
+const MAX_TURN = 9; // giro máximo (rad/s): giros rápidos pero nunca instantáneos
+
+/** Gira el ángulo a hacia b con amortiguación y velocidad máxima. */
+function turnToward(a, b, lambda, dt) {
+  const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  const step = d * (1 - Math.exp(-lambda * dt));
+  const max = MAX_TURN * dt;
+  return a + Math.max(-max, Math.min(max, step));
+}
 
 export class Companion {
   constructor(game, id, index = 0) {
@@ -22,6 +34,8 @@ export class Companion {
     this.pos = new THREE.Vector3();
     this.facing = 0;
     this.state = 'follow'; // follow | attack
+    this.moving = false; // en modo seguir: true mientras camina hacia el héroe
+    this.turning = false; // en reposo: girándose hacia el héroe
     this.stateT = 0;
     this.cool = 0;
     this.target = null;
@@ -49,16 +63,24 @@ export class Companion {
     this.root.position.copy(this.pos);
   }
 
-  /** Enemigo al que atacar: el más cercano al héroe dentro de su zona de combate. */
+  /**
+   * Enemigo al que atacar: el más cercano al héroe dentro de su zona de combate.
+   * Mantiene el objetivo actual mientras siga siendo válido (salvo que otro esté
+   * claramente más cerca), para no ir y venir entre dos enemigos.
+   */
   pickTarget() {
     const p = this.game.player;
+    const valid = (e) => e.alive && e.state !== 'dead' && !e.dormant && !(e.def.flying && e.body?.position.y > 2.6);
     let best = null, bd = 12;
     for (const e of this.game.enemies) {
-      if (!e.alive || e.state === 'dead') continue;
-      if (e.def.flying && e.body?.position.y > 2.6) continue;
-      if (e.dormant) continue;
+      if (!valid(e)) continue;
       const d = Math.hypot(e.x - p.x, e.z - p.z);
       if (d < bd) { bd = d; best = e; }
+    }
+    const cur = this.target;
+    if (cur && valid(cur) && best !== cur) {
+      const dc = Math.hypot(cur.x - p.x, cur.z - p.z);
+      if (dc < 14 && dc < bd + 3) return cur;
     }
     return best;
   }
@@ -76,7 +98,7 @@ export class Companion {
     if (this.state === 'attack') {
       const T = def.attackTime;
       const e = this.target;
-      if (e && e.alive) this.facing = dampAngle(this.facing, Math.atan2(e.x - this.x, e.z - this.z), 10, dt);
+      if (e && e.alive) this.facing = turnToward(this.facing, Math.atan2(e.x - this.x, e.z - this.z), 10, dt);
       if (!this.didHit && this.stateT > T * 0.45) {
         this.didHit = true;
         if (e && e.alive && Math.hypot(e.x - this.x, e.z - this.z) < def.range + e.radius + 0.6) {
@@ -100,21 +122,46 @@ export class Companion {
           g.audio.sfx('swing');
         }
       } else {
-        // seguir: a un lado y algo detrás del héroe
-        const side = def.side ?? (this.index % 2 ? 1 : -1);
-        const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
-        const tx = p.x - fx * 1.8 + fz * side * 1.5, tz = p.z - fz * 1.8 - fx * side * 1.5;
-        const d = Math.hypot(tx - this.x, tz - this.z);
-        if (d > 0.6) {
-          moveDir = Math.atan2(tx - this.x, tz - this.z);
-          speed = Math.min(def.speed * 1.4, d * 3.2);
-        } else this.facing = dampAngle(this.facing, p.facing, 3, dt);
+        // seguir: el punto de llegada está en la línea entre el héroe y el
+        // compañero, así no depende de hacia dónde mira el héroe (no gira con él)
+        const dx = this.x - p.x, dz = this.z - p.z, d = Math.hypot(dx, dz) || 1;
+        if (!this.moving && d > FAR) this.moving = true;
+        if (this.moving) {
+          const tx = p.x + dx / d * STOP, tz = p.z + dz / d * STOP;
+          const dt2 = Math.hypot(tx - this.x, tz - this.z);
+          if (dt2 < 0.25 || d < STOP + 0.3) this.moving = false;
+          else {
+            moveDir = Math.atan2(tx - this.x, tz - this.z);
+            // alcanza al héroe aunque corra; frena al llegar
+            speed = Math.min(def.speed * 1.45, Math.max(2.2, dt2 * 2.6));
+          }
+        }
+        if (!this.moving) {
+          // en reposo: se gira hacia el héroe solo cuando éste queda bastante de lado
+          const want = Math.atan2(-dx, -dz);
+          const off = Math.abs(Math.atan2(Math.sin(want - this.facing), Math.cos(want - this.facing)));
+          if (off > 1.1 && d > 1.6) this.turning = true;
+          if (this.turning) {
+            this.facing = turnToward(this.facing, want, 3, dt);
+            if (off < 0.15) this.turning = false;
+          }
+        }
       }
     }
 
     if (speed > 0) {
-      this.facing = dampAngle(this.facing, moveDir, 10, dt);
+      this.turning = false;
+      this.facing = turnToward(this.facing, moveDir, 10, dt);
+      // primero se orienta y luego avanza: no camina de lado ni hacia atrás
+      const align = Math.max(0, Math.cos(Math.atan2(Math.sin(moveDir - this.facing), Math.cos(moveDir - this.facing))));
+      speed *= 0.25 + 0.75 * align;
       this.move(Math.sin(moveDir) * speed * dt, Math.cos(moveDir) * speed * dt);
+    }
+    // no amontonarse con los otros compañeros
+    for (const o of g.companions) {
+      if (o === this) continue;
+      const ox = this.x - o.x, oz = this.z - o.z, od = Math.hypot(ox, oz);
+      if (od > 0.001 && od < 1.7) this.move(ox / od * (1.7 - od) * 0.5, oz / od * (1.7 - od) * 0.5);
     }
     // no pisar al héroe
     const dx = this.x - p.x, dz = this.z - p.z, dd = Math.hypot(dx, dz);

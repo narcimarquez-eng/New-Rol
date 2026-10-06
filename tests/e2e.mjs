@@ -409,6 +409,26 @@ try {
     return Math.hypot(c.x - g.player.x, c.z - g.player.z);
   });
   ok(follow < 6, `el compañero sigue al héroe (a ${follow.toFixed(1)} u)`);
+  // Kael conserva la cabeza (su malla se llama Rogue_Head_Hooded) y no da vueltas
+  // alrededor del héroe cuando éste cambia de dirección en zigzag
+  const calm = await page.evaluate(() => {
+    const g = window.__game, c = g.companions[0];
+    const head = c.model.root.getObjectByName('Rogue_Head_Hooded');
+    let rot = 0, hero = 0, f = c.facing, hf = g.player.facing;
+    for (let i = 0; i < 240; i++) {
+      g.input.down.clear();
+      g.input.down.add(Math.floor(i / 20) % 2 ? 'left' : 'right'); g.input.down.add('up');
+      window.__t.sim(1 / 60);
+      const d = Math.abs(Math.atan2(Math.sin(c.facing - f), Math.cos(c.facing - f)));
+      if (!c.target) rot += d; // solo mientras sigue al héroe (no al luchar)
+      hero += Math.abs(Math.atan2(Math.sin(g.player.facing - hf), Math.cos(g.player.facing - hf)));
+      f = c.facing; hf = g.player.facing;
+    }
+    g.input.down.clear();
+    return { head: !!head && head.visible, rot: Math.round(rot * 57.3), hero: Math.round(hero * 57.3) };
+  });
+  ok(calm.head, 'Kael se ve con cabeza (capucha)');
+  ok(calm.rot < 400, `el compañero no da vueltas al seguir al héroe en zigzag (gira ${calm.rot}°, el héroe ${calm.hero}°)`);
 
   // --- el compañero lucha solo contra un enemigo cercano ---
   const helps = await page.evaluate(() => {
