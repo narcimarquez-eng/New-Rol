@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash2 } from '../core/utils.js';
+import { REALISTIC } from './Style.js';
 
 // ---------------------------------------------------------------- uniformes globales
 export const GLOBAL = {
@@ -28,9 +29,21 @@ export function gradientMap() {
 }
 
 /** Material toon con colores por vértice. Cada personaje usa su propia instancia (para destellos). */
+/**
+ * Material iluminado según el estilo global: PBR (MeshStandardMaterial) en modo
+ * realista o toon por bandas en modo dibujo animado.
+ */
+export function litMaterial(opts = {}) {
+  if (REALISTIC) {
+    const { gradientMap: _g, ...rest } = opts;
+    return new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0, ...rest });
+  }
+  return new THREE.MeshToonMaterial({ gradientMap: gradientMap(), ...opts });
+}
+
 export function charMat(opts = {}) {
-  const m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradientMap(), ...opts });
-  m.emissive = new THREE.Color(0);
+  const m = litMaterial({ vertexColors: true, ...opts });
+  if (!opts.emissive) m.emissive = new THREE.Color(0);
   return m;
 }
 
@@ -132,6 +145,7 @@ export function outlineMaterial(thickness = 0.03, color = 0x1d1712, { wind = nul
 
 /** Añade un contorno a una malla (comparte geometría; usa normales suavizadas si hace falta). */
 export function addOutline(mesh, thickness = 0.03) {
+  if (REALISTIC) return null; // el modo realista no usa contornos de tinta
   let geo = mesh.geometry;
   if (!geo.index) geo = smoothNormalsGeo(geo);
   const o = new THREE.Mesh(geo, outlineMaterial(thickness));
@@ -153,6 +167,7 @@ export function smoothNormalsGeo(geo) {
 
 /** Contorno para una InstancedMesh (comparte matrices de instancia). */
 export function instancedOutline(mesh, thickness = 0.06, wind = null) {
+  if (REALISTIC) return null;
   const geo = smoothNormalsGeo(mesh.geometry);
   const o = new THREE.InstancedMesh(geo, outlineMaterial(thickness, 0x1d1712, { wind }), mesh.count);
   o.instanceMatrix = mesh.instanceMatrix;
@@ -274,7 +289,7 @@ export function faceDecal(radius, style, eye, { width = 1.6, height = 1.1, cente
   const tex = faceTexture(style, eye).clone();
   tex.needsUpdate = true;
   const geo = new THREE.SphereGeometry(radius * 1.012, 24, 14, Math.PI / 2 - width / 2, width, center - height / 2, height);
-  const mat = new THREE.MeshToonMaterial({ map: tex, transparent: true, alphaTest: 0.35, gradientMap: gradientMap(), depthWrite: false });
+  const mat = litMaterial({ map: tex, transparent: true, alphaTest: 0.35, depthWrite: false });
   mat.emissive = new THREE.Color(0);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 2;

@@ -21,14 +21,19 @@ export default {
   terrain: { amplitude: 0.9, seed: 3 },
   palette: {
     ground: { grass: 0x7cc35a, forest: 0x4f9a46, path: 0xd8b878, stone: 0xbfb6a6, sand: 0xe8d39a, water: 0x3d8fc6 },
+    groundReal: { grass: 0x7d9a4a, forest: 0x5f7d36, path: 0x9c8466, stone: 0x99928a, sand: 0xb8a888, water: 0x5a5040 },
     trunk: 0x8b5a2b, leaf: 0x58b947, leaf2: 0x76d05a, pine: 0x2f7d4a, pine2: 0x3d9a59,
     rock: 0x9aa0a6, rock2: 0x80868c, bush: 0x4caf50, hedge: 0x3f8f3f, hedge2: 0x55a84a, cliffTop: 0x6cbf4f,
     wood: 0x8b5a2b, wood2: 0xa87442, grassTuft: 0x6dbb4f,
     skyTop: 0x3b8ee8, skyHorizon: 0xbfe6ff, skyBottom: 0xa8d8f0, fog: 0xbfe6ff,
     water: 0x58b7e8, waterDeep: 0x2a6fb0, mountain: 0x6b8fb8, mountainSnow: 0xffffff,
-    sunColor: 0xfff1d0, sunIntensity: 2.6, hemiSky: 0xcfeaff, hemiGround: 0x6a8f4a, hemiIntensity: 1.1,
+    sunColor: 0xfff1d0, hemiSky: 0xcfeaff, hemiGround: 0x6a8f4a, hemiIntensity: 1.1,
   },
   fog: { near: 60, far: 170 },
+  // modo realista: tarde dorada con bruma suave
+  atmosphere: { backdrop: { peak: 100, snowline: 60 }, elevation: 24, azimuth: 215, turbidity: 4.5, rayleigh: 1.8, mie: 0.005, haze: 0xd8cdb8, fogDensity: 0.0035,
+    sunColor: 0xffdcae, waterColor: 0x23403e },
+  trees: ['oak', 'cherry'],
   music: { root: 60, scale: [0, 2, 4, 5, 7, 9, 11], tempo: 92, prog: [0, 3, 4, 0, 5, 3, 4, 4], lead: 'square', pad: 'sine' },
   map: [
     '^^^^^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^',

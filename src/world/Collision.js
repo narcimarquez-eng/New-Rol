@@ -1,6 +1,7 @@
 // Colisiones 2D (plano XZ) contra la rejilla de casillas y colliders dinámicos.
 // El jugador y los enemigos son círculos; casas, puertas, cofres son cajas AABB.
 import { TILE, tileInfo } from './tiles.js';
+import { REALISTIC } from '../gfx/Style.js';
 
 export class Collision {
   constructor(zone) {
@@ -12,7 +13,9 @@ export class Collision {
     for (let r = 0; r < this.H; r++) for (let c = 0; c < this.W; c++) {
       const t = tileInfo(zone.charAt(c, r));
       // los muros de roca (estilo 'rock') son más altos que los setos
-      const h = t.prop === 'wall' && zone.data.wallStyle === 'rock' ? 8.5 : t.height || 5;
+      let h = t.prop === 'wall' && zone.data.wallStyle === 'rock' ? 8.5 : t.height || 5;
+      // en modo realista los árboles y los muros de bosque son más altos
+      if (REALISTIC && (t.prop === 'tree' || t.prop === 'pine' || (t.prop === 'wall' && zone.data.wallStyle !== 'rock'))) h = 11;
       this.solid[r * this.W + c] = t.solid ? { kind: t.solid, radius: t.radius || 0, tall: !!t.tall, height: h } : null;
     }
     this.colliders = new Set(); // {type:'box'|'circle', ..., tall, enabled}

@@ -13,6 +13,7 @@ import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetSt
 import { Particles } from '../systems/Particles.js';
 import { Projectiles } from '../systems/Projectiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
+import { REALISTIC } from '../gfx/Style.js';
 import { Combat } from '../systems/Combat.js';
 import { CameraController } from '../systems/CameraController.js';
 import { Progress } from '../systems/Progress.js';
@@ -114,10 +115,10 @@ export class Game {
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffffff, 2.5);
     this.sun.castShadow = true;
-    const s = low ? 1024 : 2048;
+    const s = low ? 1024 : REALISTIC ? 4096 : 2048;
     this.sun.shadow.mapSize.set(s, s);
     const sc = this.sun.shadow.camera;
-    sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 140;
+    sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 200;
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.04;
     this.sun.shadow.radius = 3;
@@ -131,6 +132,8 @@ export class Game {
   }
 
   applyZoneLighting(zone) {
+    if (REALISTIC) { this.applyRealLighting(zone); return; }
+    this.scene.environment = null;
     const pal = zone.palette;
     this.hemi.color.set(pal.hemiSky); this.hemi.groundColor.set(pal.hemiGround); this.hemi.intensity = pal.hemiIntensity;
     this.sun.color.set(pal.sunColor); this.sun.intensity = pal.sunIntensity;
@@ -143,9 +146,31 @@ export class Game {
     this.torchPower = zone.data.torchIntensity ?? 9;
   }
 
+  /** Luz del modo realista: sol en la dirección del cielo físico, IBL y niebla de distancia. */
+  applyRealLighting(zone) {
+    const atmo = zone.data.atmosphere || {};
+    this.scene.environment = zone.envMap;
+    this.scene.environmentIntensity = atmo.envIntensity ?? 0.4;
+    this.scene.background = null;
+    this.scene.fog = new THREE.FogExp2(zone.hazeColor, atmo.fogDensity ?? 0.004);
+    this.sun.color.set(atmo.sunColor ?? 0xffe2b8);
+    this.sun.intensity = atmo.sunIntensity ?? 5.5;
+    this.hemi.color.set(atmo.skyLight ?? 0xbfd6ff); this.hemi.groundColor.set(atmo.groundLight ?? 0x5a5040);
+    this.hemi.intensity = atmo.hemiIntensity ?? 0.1;
+    this.sunOffset = zone.sunDir.clone().multiplyScalar(80);
+    this.gfx.setGrade({ saturation: 1.06, contrast: 1.05, warmth: 0.018, vignette: 0.3, ...(zone.data.gradeReal || {}) });
+    this.gfx.renderer.toneMappingExposure = atmo.exposure ?? 0.48;
+    // solo lo muy brillante (sol, reflejos, antorchas) produce resplandor
+    this.gfx.bloom.strength = atmo.bloom ?? 0.18;
+    this.gfx.bloom.threshold = 1.4;
+    this.gfx.bloom.radius = 0.25;
+    this.torchPower = zone.data.torchIntensity ?? 9;
+  }
+
   updateLights() {
     const p = this.player;
-    this.sun.position.set(p.x + 30, 55, p.z + 22);
+    if (this.sunOffset) this.sun.position.set(p.x + this.sunOffset.x, this.sunOffset.y, p.z + this.sunOffset.z);
+    else this.sun.position.set(p.x + 30, 55, p.z + 22);
     this.sun.target.position.set(p.x, 0, p.z);
     // las luces puntuales se asignan a las antorchas más cercanas
     const torches = this.zone.torches
@@ -257,7 +282,7 @@ export class Game {
     this.ui.hideBoss();
 
     const data = ZONES[id];
-    const zone = new Zone(data, { high: !this.gfx.lowQuality });
+    const zone = new Zone(data, { high: !this.gfx.lowQuality, renderer: this.gfx.renderer });
     this.zone = zone;
     this.scene.add(zone.group);
     this.applyZoneLighting(zone);

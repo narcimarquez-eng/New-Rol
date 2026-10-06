@@ -9,6 +9,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { REALISTIC } from '../gfx/Style.js';
 
 const GradeShader = {
   uniforms: {
@@ -56,9 +57,12 @@ export class Renderer {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 400);
+    // en modo realista las montañas están más lejos (perspectiva aérea)
+    this.camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, REALISTIC ? 700 : 400);
 
-    this.composer = new EffectComposer(this.renderer);
+    // antialiasing MSAA dentro del post-procesado (bordes de hojas y vallas limpios)
+    const rt = new THREE.WebGLRenderTarget(innerWidth * this.pixelRatio, innerHeight * this.pixelRatio, { type: THREE.HalfFloatType, samples: lowQuality ? 0 : 4 });
+    this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     if (!lowQuality) {
       try {

@@ -4,6 +4,11 @@
 import * as THREE from 'three';
 import { TILE, tileInfo } from './tiles.js';
 import { fbm } from '../core/utils.js';
+import { REALISTIC } from '../gfx/Style.js';
+import { terrainMaterial } from '../gfx/Materials.js';
+
+// capa de textura del terreno realista por tipo de suelo: césped, tierra, piedra, nieve
+const LAYER = { grass: 0, forest: 0, path: 1, sand: 1, water: 1, stone: 2, snow: 3, ice: 3 };
 
 const SUB = 2; // vértices por casilla (resolución)
 
@@ -29,7 +34,7 @@ export class Terrain {
         this.heights[j * this.VW + i] = h;
       }
     }
-    this.mesh = this.buildMesh(zone.palette);
+    this.mesh = this.buildMesh(REALISTIC && zone.palette.groundReal ? { ...zone.palette, ground: zone.palette.groundReal } : zone.palette);
   }
 
   waterFraction(i, j) {
@@ -68,6 +73,11 @@ export class Terrain {
     const VW = this.VW, VH = this.VH;
     const pos = new Float32Array(VW * VH * 3);
     const col = new Float32Array(VW * VH * 3);
+    const splat = new Float32Array(VW * VH * 4);
+    const layerAt = (x, z) => {
+      const tc = Math.floor((x - this.originX) / TILE), tr = Math.floor((z - this.originZ) / TILE);
+      return LAYER[tileInfo(zone.charAt(tc, tr)).ground] ?? 0;
+    };
     const c = new THREE.Color(), acc = new THREE.Color();
     const zone = this.zone;
     const colorAt = (x, z) => {
@@ -89,6 +99,7 @@ export class Terrain {
         for (const [ox, oz, w] of [[0, 0, 0.4], [1.2, 0, 0.15], [-1.2, 0, 0.15], [0, 1.2, 0.15], [0, -1.2, 0.15]]) {
           c.set(colorAt(x + ox, z + oz));
           acc.r += c.r * w; acc.g += c.g * w; acc.b += c.b * w;
+          splat[k * 4 + layerAt(x + ox, z + oz)] += w;
         }
         // variación suave de tono a gran escala
         const n = fbm(x * 0.06, z * 0.06, 31, 2) - 0.5;
@@ -117,8 +128,15 @@ export class Terrain {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
     geo.setIndex(idx);
     geo.computeVertexNormals();
+    if (REALISTIC) {
+      const mesh = new THREE.Mesh(geo, terrainMaterial());
+      mesh.receiveShadow = true;
+      mesh.name = 'terrain';
+      return mesh;
+    }
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     mat.onBeforeCompile = (sh) => {
       sh.vertexShader = 'varying vec3 vWPos;\n' + sh.vertexShader.replace(

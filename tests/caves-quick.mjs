@@ -9,7 +9,7 @@ await new Promise((res) => server.stdout.on('data', (d) => { if (String(d).inclu
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 page.on('pageerror', (e) => console.log('PAGEERROR', e));
-await page.goto('http://localhost:4177/?fixeddt&low');
+await page.goto('http://localhost:4177/?fixeddt&low&toon');
 await page.waitForFunction(() => window.__game && window.__game.firstFrameAt, null, { timeout: 60000 });
 await page.click('#btn-new');
 await page.evaluate(() => {

@@ -4,12 +4,15 @@
 // 3. Juega: movimiento, ataque, diálogo, tutorial, zonas, combate.
 // 4. Comprueba colisiones (no atravesar paredes) y la cámara (no atraviesa suelo/muros).
 // 5. Guarda capturas en test-results/.
+// La lógica se prueba con el estilo ilustrado (?toon), que es rápido de dibujar
+// en el renderizador por software de CI; el estilo realista tiene su propia
+// prueba de humo (tests/real-smoke.mjs). STYLE=real ejecuta todo en realista.
 import { chromium } from 'playwright-core';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, existsSync } from 'node:fs';
 
 const PORT = 4173;
-const URL = `http://localhost:${PORT}/?fixeddt`;
+const URL = `http://localhost:${PORT}/?fixeddt${process.env.STYLE === 'real' ? '' : '&toon'}`;
 const OUT = 'test-results';
 mkdirSync(OUT, { recursive: true });
 

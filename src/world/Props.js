@@ -2,8 +2,11 @@
 // Las geometrías se fusionan con colores por vértice para poder instanciarse
 // (un draw call por tipo de objeto en toda la zona).
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spart, smerge, rockify, gradientMap as kitGradient } from '../gfx/ModelKit.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { spart, smerge, rockify, gradientMap as kitGradient, litMaterial } from '../gfx/ModelKit.js';
+import { REALISTIC } from '../gfx/Style.js';
+import { fbm } from '../core/utils.js';
+import { triplanar, woodTextures, plasterTextures, roofTextures, rockTextures } from '../gfx/Materials.js';
 
 // ---------- materiales compartidos ----------
 let gradientMap = null;
@@ -23,12 +26,16 @@ const matCache = new Map();
 export function toonMat(opts = {}) {
   const key = JSON.stringify(opts);
   if (matCache.has(key)) return matCache.get(key);
-  const m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradient(), ...opts });
+  // en modo realista los objetos pequeños (mayoría de madera) usan madera triplanar teñida
+  const m = REALISTIC && !opts.emissive && !opts.transparent
+    ? triplanar({ set: woodTextures(), scale: 0.55, normalStrength: 0.5, vertexColors: true, ...(opts.side ? {} : {}) })
+    : litMaterial({ vertexColors: true, ...opts });
+  if (REALISTIC && opts.side) m.side = opts.side;
   matCache.set(key, m);
   return m;
 }
 export function toonColor(color, opts = {}) {
-  return new THREE.MeshToonMaterial({ color, gradientMap: getGradient(), ...opts });
+  return litMaterial({ color, ...opts });
 }
 
 // ---------- utilidades de geometría ----------
@@ -160,6 +167,34 @@ export function cliffGeo(pal) {
   return smerge(parts);
 }
 
+/**
+ * Bloque de acantilado del modo realista: columna de roca con relieve suave
+ * (ruido coherente, sin facetas), cornisas horizontales y esquinas redondeadas.
+ * El material triplanar le pone la textura y el musgo/nieve de la cara superior.
+ */
+export function cliffGeoReal(seed = 1) {
+  let g = new THREE.BoxGeometry(4.6, 6.4, 4.6, 8, 12, 8);
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  g = mergeVertices(g, 1e-4);
+  const pos = g.attributes.position;
+  const hw = 2.3;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    // esquinas redondeadas
+    const k = 1 - 0.16 * (Math.abs(x) * Math.abs(z)) / (hw * hw);
+    x *= k; z *= k;
+    const len = Math.hypot(x, z) || 1;
+    const n = fbm(x * 0.35 + y * 0.22 + seed * 3.1, z * 0.35 - y * 0.18, seed + 5, 4) - 0.5;
+    const ledge = Math.sin(y * 2.1 + n * 4) * 0.12;
+    const off = n * 1.3 + ledge;
+    const edge = Math.min(1, (y + 3.2) / 1.2); // la base no se mete hacia dentro
+    x += (x / len) * off * edge; z += (z / len) * off * edge;
+    if (y > 3.1) y += (fbm(x * 0.5 + 7, z * 0.5, seed + 9, 3) - 0.5) * 0.9;
+    pos.setXYZ(i, x, y, z);
+  }
+  return smerge([spart(g, 0xffffff, { y: 3.0, ao: 0.45 })]);
+}
+
 /** Racimo de cristales de hielo luminosos. */
 export function crystalGeo(pal) {
   const c = pal.crystal ?? 0x9fe7ff, c2 = pal.crystal2 ?? 0xd6f7ff;
@@ -221,7 +256,9 @@ export function bridgeGeo(pal) {
 }
 
 // ---------- objetos individuales ----------
-export function buildHouse({ w = 8, d = 6, h = 3.4, wall = 0xf2e3c2, roof = 0xc0473a, trim = 0x7a4b2a, door = 'south' } = {}) {
+export function buildHouse(opts = {}) {
+  if (REALISTIC) return buildHouseReal(opts);
+  const { w = 8, d = 6, h = 3.4, wall = 0xf2e3c2, roof = 0xc0473a, trim = 0x7a4b2a, door = 'south' } = opts;
   const g = new THREE.Group();
   const parts = [
     part(new THREE.BoxGeometry(w, h, d), wall, { y: h / 2 }),
@@ -249,6 +286,62 @@ export function buildHouse({ w = 8, d = 6, h = 3.4, wall = 0xf2e3c2, roof = 0xc0
   const mesh = new THREE.Mesh(merge(parts), toonMat());
   mesh.castShadow = true; mesh.receiveShadow = true;
   g.add(mesh);
+  return g;
+}
+
+/** Casa realista: cimientos de piedra, yeso, entramado de madera, tejas, vidrio. */
+function buildHouseReal({ w = 8, d = 6, h = 3.4, wall = 0xf2e3c2, roof = 0xc0473a, trim = 0x7a4b2a, door = 'south' } = {}) {
+  const g = new THREE.Group();
+  const stone = triplanar({ key: 'house-stone', set: rockTextures(), scale: 0.45, normalStrength: 1, vertexColors: false, color: 0xb0aaa0 });
+  const plaster = triplanar({ set: plasterTextures(), scale: 0.35, normalStrength: 0.5, vertexColors: false, color: wall });
+  const wood = triplanar({ key: 'house-wood', set: woodTextures(), scale: 0.5, normalStrength: 0.7, vertexColors: false, color: 0x8a6a50 });
+  const add = (geo, mat, x = 0, y = 0, z = 0, ry = 0, rx = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z); m.rotation.set(rx, ry, 0);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    return m;
+  };
+  add(new THREE.BoxGeometry(w + 0.4, 0.7, d + 0.4), stone, 0, 0.35);
+  add(new THREE.BoxGeometry(w, h, d), plaster, 0, h / 2 + 0.3);
+  // entramado de madera
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(new THREE.BoxGeometry(0.32, h, 0.32), wood, sx * w / 2, h / 2 + 0.3, sz * d / 2);
+  for (const sz of [-1, 1]) {
+    add(new THREE.BoxGeometry(w + 0.1, 0.26, 0.3), wood, 0, h + 0.2, sz * d / 2);
+    add(new THREE.BoxGeometry(w + 0.1, 0.2, 0.26), wood, 0, h * 0.55 + 0.3, sz * d / 2);
+  }
+  // tejado a dos aguas con tejas (UV de caja, repetición según tamaño)
+  const rise = 2.3, half = d / 2 + 0.7;
+  const slope = Math.hypot(half, rise), ang = Math.atan2(rise, half);
+  const rt = roofTextures();
+  const rep = (t) => { const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set((w + 1) / 1.6, slope / 1.1); c.needsUpdate = true; return c; };
+  const roofMat = new THREE.MeshStandardMaterial({ map: rep(rt.map), normalMap: rep(rt.normalMap), roughnessMap: rep(rt.roughnessMap), color: roof });
+  for (const s of [-1, 1]) {
+    const panel = add(new THREE.BoxGeometry(w + 1, 0.16, slope), roofMat, 0, h + 0.3 + rise / 2, s * half / 2, 0, s * ang);
+    panel.rotation.x = s * ang;
+  }
+  add(new THREE.BoxGeometry(w + 1.05, 0.22, 0.32), wood, 0, h + 0.32 + rise, 0); // cumbrera
+  // hastiales (triángulos de yeso)
+  const tri = new THREE.Shape();
+  tri.moveTo(-d / 2, 0); tri.lineTo(d / 2, 0); tri.lineTo(0, rise * (d / 2) / half); tri.lineTo(-d / 2, 0);
+  const gable = new THREE.ExtrudeGeometry(tri, { depth: 0.2, bevelEnabled: false });
+  for (const sx of [-1, 1]) add(gable, plaster, sx * (w / 2) - (sx > 0 ? 0.2 : 0), h + 0.3, 0, Math.PI / 2);
+  // chimenea
+  add(new THREE.BoxGeometry(0.9, 2.4, 0.9), stone, w / 4, h + 1.6, -d / 6);
+  // fachada: puerta, ventanas con vidrio y marco
+  const fz = door === 'north' ? -d / 2 - 0.06 : d / 2 + 0.06;
+  const glass = new THREE.MeshStandardMaterial({ color: 0x2a3a48, roughness: 0.05, metalness: 0.6 });
+  add(new THREE.BoxGeometry(1.4, 2.2, 0.16), wood, 0, 1.4, fz);
+  for (const wx of [-w / 3, w / 3]) {
+    add(new THREE.BoxGeometry(1.25, 1.1, 0.14), wood, wx, 2.2, fz);
+    add(new THREE.BoxGeometry(1.0, 0.85, 0.16), glass, wx, 2.2, fz + Math.sign(fz) * 0.02);
+    add(new THREE.BoxGeometry(1.4, 0.14, 0.4), wood, wx, 1.6, fz);
+  }
+  // ventanas laterales
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.14, 1.0, 1.1), wood, sx * (w / 2 + 0.05), 2.2, 0);
+    add(new THREE.BoxGeometry(0.16, 0.78, 0.86), glass, sx * (w / 2 + 0.07), 2.2, 0);
+  }
   return g;
 }
 
@@ -317,7 +410,7 @@ export function buildGate({ width = 4, color = 0xc9a227, style = 'wood' } = {}) 
     door = new THREE.Mesh(smerge([
       spart(rockify(new THREE.BoxGeometry(width - 0.5, 4.1, 1.1, 4, 4, 2), 0.18, 31), 0xbfefff, { y: 2.05, ao: 0.25, flat: true }),
       spart(new THREE.OctahedronGeometry(0.45, 0), color, { y: 2.1, z: 0.5, sy: 1.4, ao: 0, flat: true }),
-    ]), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradient(), transparent: true, opacity: 0.88 }));
+    ]), litMaterial({ vertexColors: true, transparent: true, opacity: 0.88, roughness: 0.15 }));
   } else {
     const doorParts = [];
     const n = 5;
@@ -344,7 +437,7 @@ export function buildIceBlock() {
     spart(new THREE.BoxGeometry(3.6, 0.35, 3.6), 0xf2fbff, { y: 3.05, ao: 0, flat: true }),
     spart(new THREE.BoxGeometry(0.15, 2.2, 0.1), 0xe8f9ff, { x: -0.9, y: 1.6, z: 1.76, rz: 0.3, ao: 0, flat: true }),
     spart(new THREE.BoxGeometry(0.12, 1.4, 0.1), 0xe8f9ff, { x: 0.8, y: 1.2, z: 1.76, rz: -0.5, ao: 0, flat: true }),
-  ]), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradient(), emissive: new THREE.Color(0x10303f) }));
+  ]), litMaterial({ vertexColors: true, emissive: new THREE.Color(0x10303f), roughness: 0.2 }));
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
@@ -357,7 +450,7 @@ export function buildPlate() {
   ]), toonMat());
   base.receiveShadow = true;
   g.add(base);
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.2, 16), new THREE.MeshToonMaterial({ color: 0x9fb4cc, gradientMap: getGradient(), emissive: new THREE.Color(0) }));
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.2, 16), litMaterial({ color: 0x9fb4cc, emissive: new THREE.Color(0) }));
   top.position.y = 0.28;
   g.add(top);
   const rune = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.08, 6, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.2, 1.8), toneMapped: false }));

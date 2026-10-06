@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { TILE, tileInfo } from './tiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
 import { rng } from '../core/utils.js';
+import { REALISTIC } from '../gfx/Style.js';
 
 function bladeGeometry() {
+  if (REALISTIC) return bladeGeometryReal();
   // brizna estrecha de 5 vértices (3 triángulos), con color base->punta
   const pos = [-0.07, 0, 0, 0.07, 0, 0, -0.05, 0.24, 0, 0.05, 0.24, 0, 0, 0.48, 0];
   const g = new THREE.BufferGeometry();
@@ -18,6 +20,18 @@ function bladeGeometry() {
   return g;
 }
 
+/** Brizna realista: más fina y alta, curvada, base oscura y punta clara. */
+function bladeGeometryReal() {
+  const pos = [-0.035, 0, 0, 0.035, 0, 0, -0.028, 0.3, 0.03, 0.028, 0.3, 0.03, -0.016, 0.55, 0.09, 0.016, 0.55, 0.09, 0, 0.75, 0.17];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(7).fill([0, 1, 0]).flat(), 3));
+  const c = [0.45, 0.45, 0.62, 0.62, 0.82, 0.82, 1.05];
+  g.setAttribute('color', new THREE.Float32BufferAttribute(c.flatMap((v, i) => [v * (i > 3 ? 1.05 : 1), v, v * (i > 3 ? 0.85 : 1)]), 3));
+  g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4, 4, 5, 6]);
+  return g;
+}
+
 /**
  * @param {import('./Zone.js').Zone} zone
  * @param {number} density briznas por casilla
@@ -26,8 +40,9 @@ export function buildGrass(zone, density = 48) {
   const pal = zone.palette;
   const r = rng(77);
   const items = [];
-  const cGrass = new THREE.Color(pal.grassBlade ?? pal.ground.grass);
-  const cForest = new THREE.Color(pal.grassBlade2 ?? pal.ground.forest);
+  const g = REALISTIC && pal.groundReal ? pal.groundReal : pal.ground;
+  const cGrass = new THREE.Color(REALISTIC ? (pal.grassBladeReal ?? g.grass) : (pal.grassBlade ?? g.grass));
+  const cForest = new THREE.Color(REALISTIC ? (pal.grassBladeReal2 ?? g.forest) : (pal.grassBlade2 ?? g.forest));
   for (let row = 0; row < zone.H; row++) {
     for (let c = 0; c < zone.W; c++) {
       const info = tileInfo(zone.charAt(c, row));
@@ -53,7 +68,9 @@ export function buildGrass(zone, density = 48) {
     }
   }
   const geo = bladeGeometry();
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const mat = REALISTIC
+    ? new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 })
+    : new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = GLOBAL.time;
     sh.uniforms.uPlayer = GLOBAL.playerPos;
@@ -65,7 +82,7 @@ export function buildGrass(zone, density = 48) {
       #ifdef USE_INSTANCING
         mvPosition = instanceMatrix * mvPosition;
       #endif
-      float h = position.y / 0.48;
+      float h = position.y / ${REALISTIC ? '0.75' : '0.48'};
       float bend = h * h;
       vec2 wp = mvPosition.xz;
       float gust = sin(uTime * 1.7 + wp.x * 0.35 + wp.y * 0.22) * 0.6 + sin(uTime * 3.1 + wp.x * 0.9) * 0.25;
