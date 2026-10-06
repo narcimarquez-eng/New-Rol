@@ -429,6 +429,21 @@ try {
   });
   ok(calm.head, 'Kael se ve con cabeza (capucha)');
   ok(calm.rot < 400, `el compañero no da vueltas al seguir al héroe en zigzag (gira ${calm.rot}°, el héroe ${calm.hero}°)`);
+  // con el héroe parado al lado, la cabeza del compañero le mira sin girar sin parar
+  // (el giro de la mirada no debe acumularse cuando la animación de reposo apenas cambia)
+  const headCalm = await page.evaluate(() => {
+    const g = window.__game, c = g.companions[0], p = g.player, m = c.model;
+    const a = c.facing - Math.PI * 0.6;
+    p.place(c.x + Math.sin(a) * 2.5, c.z + Math.cos(a) * 2.5, 0);
+    c.moving = false; c.turning = false;
+    window.__t.sim(0.2);
+    const Q = m.head.quaternion.constructor, V = m.head.position.constructor;
+    const dir = () => { m.root.updateMatrixWorld(true); const r = m.root.getWorldQuaternion(new Q()).invert(); return new V(0, 0, 1).applyQuaternion(r.multiply(m.head.getWorldQuaternion(new Q()))); };
+    let prev = dir(), sum = 0;
+    for (let i = 0; i < 240; i++) { window.__t.sim(1 / 60); const v = dir(); sum += Math.acos(Math.min(1, Math.max(-1, v.dot(prev)))); prev = v; }
+    return { deg: Math.round(sum * 57.3), looking: !!m.looking };
+  });
+  ok(headCalm.deg < 120, `la cabeza del compañero no da vueltas con el héroe parado (${headCalm.deg}° en 4 s, mirando: ${headCalm.looking})`);
 
   // --- el compañero lucha solo contra un enemigo cercano ---
   const helps = await page.evaluate(() => {

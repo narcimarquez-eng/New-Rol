@@ -169,7 +169,14 @@ export class KayKitModel {
     for (const a of this.actions.values()) { a.w += (a.target - a.w) * k; if (a.target === 0 && a.w < 0.002) a.w = 0; total += a.w; }
     if (total < 1e-4) { const idle = this.slot(this.clips.idle); idle.w = 1; total = 1; }
     for (const a of this.actions.values()) a.action.setEffectiveWeight(a.w / total);
+    // la mirada gira la cabeza y el pecho encima de la animación; el mezclador solo
+    // reescribe un hueso si su valor animado cambia (en reposo casi no cambia), así
+    // que se restaura la pose animada antes de actualizar para que el giro no se acumule
+    if (this.posed) { this.head?.quaternion.copy(this.posed.head); this.chest?.quaternion.copy(this.posed.chest); }
     this.mixer.update(dt);
+    if (!this.posed) this.posed = { head: new THREE.Quaternion(), chest: new THREE.Quaternion() };
+    if (this.head) this.posed.head.copy(this.head.quaternion);
+    if (this.chest) this.posed.chest.copy(this.chest.quaternion);
 
     // --- capa dinámica: inclinación en giros y aceleraciones ---
     const yaw = this.root.rotation.y;
@@ -188,17 +195,22 @@ export class KayKitModel {
     this.lean.rotation.x += (leanX - this.lean.rotation.x) * kl;
 
     // --- mirada: cabeza (y algo el pecho) hacia el objetivo ---
+    // el ángulo se mide desde los pies (estable, no desde la cabeza ya girada), con
+    // margen para no entrar y salir en el límite, y sin mirar lo que está a la espalda
+    // ni pegado al cuerpo
     let wantYaw = 0, wantPitch = 0;
     if (this.lookTarget && this.head && !(s.dead || s.roll != null)) {
-      this.head.getWorldPosition(tmpV);
+      this.root.getWorldPosition(tmpV);
       tmpV2.copy(this.lookTarget).sub(tmpV);
-      const fwd = yaw;
-      const ang = angleDiff(fwd, Math.atan2(tmpV2.x, tmpV2.z));
-      if (Math.abs(ang) < 2.2) {
+      const hd = Math.hypot(tmpV2.x, tmpV2.z);
+      const ang = angleDiff(yaw, Math.atan2(tmpV2.x, tmpV2.z));
+      this.looking = hd > 0.8 && Math.abs(ang) < (this.looking ? 1.9 : 1.5);
+      if (this.looking) {
         wantYaw = THREE.MathUtils.clamp(ang, -1.0, 1.0);
-        wantPitch = THREE.MathUtils.clamp(Math.atan2(tmpV2.y, Math.hypot(tmpV2.x, tmpV2.z)), -0.35, 0.35);
+        const eye = (this.def.height ?? 1.85) * 0.88;
+        wantPitch = THREE.MathUtils.clamp(Math.atan2(tmpV2.y - eye, Math.max(hd, 1.5)), -0.35, 0.35);
       }
-    }
+    } else this.looking = false;
     const kk = 1 - Math.exp(-dt * 6);
     this.look.yaw += (wantYaw - this.look.yaw) * kk;
     this.look.pitch += (wantPitch - this.look.pitch) * kk;
