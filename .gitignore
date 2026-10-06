@@ -5,3 +5,4 @@ test-results/
 .DS_Store
 public/assets/kaykit-preview/
 .cache/
+__pycache__/
