@@ -46,7 +46,7 @@ export default {
   fog: { near: 45, far: 150 },
   atmosphere: {
     backdrop: { style: 'desert', peak: 75, hills: 16, colors: { meadow: 0xdcb880, forest: 0xc89c64, rock: 0xb4683c } },
-    elevation: 50, azimuth: 120, turbidity: 6, rayleigh: 1.1, mie: 0.006, clouds: 0.06, haze: 0xead8b0, fogDensity: 0.0042,
+    elevation: 50, azimuth: 120, turbidity: 6, rayleigh: 1.1, mie: 0.006, clouds: 0.06, haze: 0xe6cfa0, hazeMix: 0.55, fogDensity: 0.0034,
     sunColor: 0xfff0d8, sunIntensity: 6.2, waterColor: 0x1e4a4a, groundBounce: 0xc8a070,
   },
   rockReal: 0xc89060,

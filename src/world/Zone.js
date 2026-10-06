@@ -266,7 +266,7 @@ export class Zone {
       : caves
         ? { set: snowTextures(), color: 0xffffff, from: 0.55 }
         : { set: { map: tex('tex/grass.jpg'), normalMap: rockTextures().normalMap }, color: pal.groundReal?.grass ?? 0x7d9a4a, from: 0.6 };
-    const rockMat = triplanar({ key: `rock-${this.id}`, set: rockTextures(), scale: 0.3, normalStrength: 1, vertexColors: false, color: pal.rockReal ?? 0xa09a90, top: topCover });
+    const rockMat = triplanar({ key: `rock-${this.id}`, set: rockTextures(), scale: 0.3, normalStrength: 1, vertexColors: false, color: this.data.rockReal ?? pal.rockReal ?? 0xa09a90, top: topCover });
     const woodMat = triplanar({ key: 'wood-real', set: woodTextures(), scale: 0.5, normalStrength: 0.6, vertexColors: true });
 
     // árboles sueltos (T) y pinos (P), varias especies y semillas
