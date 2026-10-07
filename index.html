@@ -6,7 +6,14 @@
   <meta name="theme-color" content="#1b2b3a" />
   <meta name="description" content="New Rol — aventura de acción 3D low-poly en el navegador." />
   <title>New Rol</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗡️</text></svg>" />
+  <link rel="icon" type="image/png" href="./icons/favicon-64.png" />
+  <!-- instalable como app desde el navegador (sin tienda): manifiesto e icono para iPhone -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="New Rol" />
   <!-- fuente cargada sin bloquear el arranque del juego -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -95,7 +102,9 @@
       <div class="title-buttons">
         <button class="btn big" id="btn-continue" disabled>Continuar</button>
         <button class="btn big" id="btn-new">Nueva partida</button>
+        <button class="btn" id="btn-install" hidden>📲 Instalar en este dispositivo</button>
       </div>
+      <p class="hint" id="install-hint" hidden></p>
       <p class="hint">WASD para moverte · ratón para la cámara · clic para atacar</p>
       <p id="loading">Cargando…</p>
     </div>

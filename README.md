@@ -13,6 +13,17 @@ y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 > santuarios y el **Castillo Final** con el jefe Malakar).
 > Estilo visual realista (PBR) por defecto; añade `?toon` a la URL para el estilo ilustrado.
 
+## Instalar en el móvil o el ordenador (sin tienda de apps)
+
+El juego es una *app web instalable*: no pasa por Google Play ni por la App Store.
+
+- **Android / Chrome / Edge**: en la pantalla de título aparece el botón
+  **📲 Instalar en este dispositivo** (o menú del navegador → «Instalar aplicación»).
+- **iPhone / iPad**: en Safari, botón **Compartir → «Añadir a pantalla de inicio»**.
+
+Queda un icono propio, se abre a pantalla completa y **funciona sin conexión** (la
+primera visita guarda el juego). Al publicar una versión nueva, se actualiza sola.
+
 ## Controles
 
 | Acción | Teclado y ratón | Móvil |
