@@ -1,10 +1,15 @@
 // Punto de entrada: arranca el juego cuando el DOM está listo.
 import { Game } from './core/Game.js';
 import { preloadCharacters } from './gfx/Characters.js';
+import { preloadMonsters } from './gfx/Monsters.js';
 
 async function boot() {
   // personajes KayKit (modelos y animaciones); si fallan, se usan los modelos procedurales
-  try { await preloadCharacters(); } catch (err) { console.warn('Personajes KayKit no disponibles:', err); }
+  // y monstruos animados (Quaternius); se cargan a la vez
+  await Promise.all([
+    preloadCharacters().catch((err) => console.warn('Personajes KayKit no disponibles:', err)),
+    preloadMonsters().catch((err) => console.warn('Monstruos animados no disponibles:', err)),
+  ]);
   try {
     new Game(document.getElementById('app'));
   } catch (err) {

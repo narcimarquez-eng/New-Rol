@@ -3,7 +3,8 @@
 Aventura de acción 3D para el navegador, inspirada en los Zelda clásicos.
 Hecha con **Three.js**: escenarios, árboles, montañas, música y efectos de sonido se
 generan por código. Los personajes (héroe, compañeros y esqueletos) son los packs
-libres **KayKit** con sus animaciones, y unas pocas texturas de corteza, hojas, césped
+libres **KayKit** con sus animaciones, los monstruos salen del pack **Ultimate Monsters**
+de Quaternius (modificados para el juego), y unas pocas texturas de corteza, hojas, césped
 y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 
 **▶ Jugar:** https://narcimarquez-eng.github.io/new-rol/
@@ -184,6 +185,32 @@ el propio terreno, mesetas escalonadas al fondo, palmeras, cactus, ruinas y colu
 procedural.
 
 Los personajes son los modelos estilizados KayKit (low-poly con esqueleto y animaciones).
+
+### Monstruos animados
+
+Limos, murciélagos, la seta mordedora, los trasgos y su rey, el espíritu de escarcha y el
+golem de hielo usan modelos animados del pack **Ultimate Monsters** de Quaternius (CC0),
+retocados para que sean propios del juego:
+
+| Enemigo | Modelo de partida | Cambios |
+|---|---|---|
+| Limo | Blob verde | gelatina brillante y translúcida |
+| Limo de hielo | Blob rosa | azul hielo translúcido con una corona de cristales de escarcha |
+| Murciélago | Demonio volador | morado, cuernos curvos y ojos que brillan |
+| Murciélago de escarcha | Demonio volador | azul y blanco, cuernos de hielo, ojos cian |
+| Planta mordedora | Mushnub | seta venenosa: sombrero rojo con motas blancas, ojos verdes |
+| Trasgo | Orco | verde con cabezota, ropa de cuero y ojos ámbar |
+| Rey Trasgo | Orco | gigante, más ancho, ropa morada y dorada, corona de oro con gemas |
+| Espíritu de escarcha | Fantasma | translúcido y luminoso, con estela de escarcha |
+| Golem de Hielo | Yeti | enorme, con crestas de cristal de hielo en la espalda, hombros y cabeza |
+
+Los colores se cambian al generar los archivos (`tools/build-monsters.mjs`); los accesorios
+(corona, cristales, cuernos, motas) se pegan a los huesos al cargar (`src/gfx/Monsters.js`),
+disparando rayos contra la malla para que queden sobre la superficie y sigan la animación.
+Cada monstruo usa sus propias animaciones (reposo, andar o volar, morder, cabezazo,
+puñetazo, golpe con el arma, recibir daño y morir) con el mismo sistema que los
+personajes KayKit: los ataques se sincronizan con la ventana de daño del juego. Si los
+modelos no cargan, el juego usa los monstruos procedurales de antes.
 Para personajes realistas harían falta modelos 3D hechos por un artista (o de una
 librería como Mixamo); el sistema de animación ya está preparado para cambiarlos.
 
@@ -198,6 +225,8 @@ node tests/real-smoke.mjs    # prueba de humo del estilo realista: todas las zon
 python3 tools/gen_shrines.py  # genera y verifica los santuarios (acertijos con solución)
 python3 tools/gen_castle.py   # genera y verifica el Castillo Final
 node tools/build-characters.mjs   # regenera los personajes KayKit optimizados (descarga los packs)
+node tools/build-monsters.mjs .cache/um   # recolorea y optimiza los monstruos (pack Ultimate Monsters en .cache/um)
+node tests/monsters.mjs   # galería de los monstruos animados (test-results/monstruos.png)
 python3 tools/gen_desert.py --check   # comprueba que todo el desierto es alcanzable
 node tests/data.mjs  # validación de los datos de las zonas
 node tests/caves-quick.mjs   # traza rápida del puzle de bloques de las cuevas
@@ -260,5 +289,7 @@ Source: GitHub Actions**.
 - Personajes y armas: packs **KayKit Adventurers** y **KayKit Skeletons** de
   [Kay Lousberg](https://www.kaylousberg.com) (CC0), optimizados con
   `tools/build-characters.mjs` (modelos sin animaciones + un archivo de animaciones compartido).
+- Monstruos: pack **Ultimate Monsters** de [Quaternius](https://quaternius.com) (CC0),
+  recoloreados y optimizados con `tools/build-monsters.mjs` y modificados en `src/gfx/Monsters.js`.
 - Todo lo demás (escenarios, texturas de adoquín, yeso, madera, tejas, roca, nieve, arena
   y arenisca, música y sonido) se genera por código en este repositorio.

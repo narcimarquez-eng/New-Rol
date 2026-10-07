@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel.js';
 import { spart, smerge, charMat, addOutline, faceDecal, rockify } from '../gfx/ModelKit.js';
 import { KayKitModel } from './KayKitModel.js';
+import { MonsterModel } from './MonsterModel.js';
+import { monstersReady } from '../gfx/Monsters.js';
 import { REALISTIC } from '../gfx/Style.js';
 
 const lighten = (hex, l) => new THREE.Color(hex).offsetHSL(0, 0, l).getHex();
@@ -292,9 +294,17 @@ function kaykit(def) {
   return { root: kk.root, body: kk.lean, mat: kk.materials[0], kk };
 }
 
+/** Monstruos Quaternius modificados (limos, murciélagos, seta, trasgos, espíritu, golem). */
+function monster(def) {
+  const mm = new MonsterModel(def.monster);
+  return { root: mm.root, body: mm.lean, mat: mm.materials[0], kk: mm };
+}
+
 const BUILDERS = { slime, bat, plant, goblin, goblinKing: goblin, wolf, spirit, golem, scorpion, kaykit };
 
 export function buildEnemyModel(def) {
+  // si los monstruos animados no cargan, se usan los modelos procedurales de siempre
+  if (def.monster && monstersReady()) return monster(def);
   const b = BUILDERS[def.model];
   if (!b) throw new Error(`Modelo de enemigo desconocido: ${def.model}`);
   return b(def);

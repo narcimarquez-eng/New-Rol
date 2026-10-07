@@ -34,26 +34,35 @@ const SCRUB = {
   Taunt: [0, 1],
 };
 
+/** Devuelve un material a su brillo propio (ojos y cristales de los monstruos) o lo apaga. */
+export function restoreEmissive(m) {
+  m.emissive.set(m.userData.baseEmissive ?? 0);
+  m.emissiveIntensity = m.userData.baseEmissiveIntensity ?? 0;
+}
+
 export class KayKitModel {
   /**
    * @param {object} def definición del personaje (ver instantiate en gfx/Characters.js) más:
    *   height: altura final · clips: { idle, walk, run, attacks:[...], dodge, block, hurt, death } ·
    *   runPace / walkPace: velocidad (en "speed" del juego) a la que el clip va a ritmo normal
    */
-  constructor(def = {}) {
+  constructor(def = {}, inst = null) {
     this.def = def;
-    const inst = instantiate(def);
+    inst = inst || instantiate(def);
     this.inst = inst;
     this.root = new THREE.Group();
     this.lean = new THREE.Group(); // inclinación procedural
     this.root.add(this.lean);
     this.lean.add(inst.scene);
-    const s = (def.height ?? 1.85) / 2.19;
+    const s = (def.height ?? 1.85) / (inst.height ?? 2.19);
     inst.scene.scale.setScalar(s);
+    inst.scene.position.y = -(inst.footY ?? 0) * s;
     this.scale = s;
     this.materials = inst.materials;
-    this.head = inst.scene.getObjectByName('head');
-    this.chest = inst.scene.getObjectByName('chest');
+    this.clipLib = inst.clips || null; // clips propios del modelo (monstruos); si no, los compartidos
+    this.scrub = { ...SCRUB, ...(def.scrub || {}) };
+    this.head = def.headBone === null ? null : inst.scene.getObjectByName(def.headBone ?? 'head');
+    this.chest = def.chestBone === null ? null : inst.scene.getObjectByName(def.chestBone ?? 'chest');
     // "arma": grupo en la mano derecha, con el eje +Y a lo largo de la hoja
     this.weapon = new THREE.Group();
     inst.hands.r.add(this.weapon);
@@ -80,7 +89,7 @@ export class KayKitModel {
   slot(name) {
     let s = this.actions.get(name);
     if (!s) {
-      const c = clip(name);
+      const c = this.clipLib ? this.clipLib.get(name) : clip(name);
       if (!c) return null;
       const action = this.mixer.clipAction(c);
       action.enabled = true;
@@ -142,7 +151,7 @@ export class KayKitModel {
       if (a) {
         a.target = 1;
         if (over.scrub != null) {
-          const [t0, t1] = SCRUB[over.name] || [0, 1];
+          const [t0, t1] = this.scrub[over.name] || [0, 1];
           a.action.timeScale = 0;
           a.action.time = (t0 + (t1 - t0) * Math.min(1, Math.max(0, over.scrub))) * a.action.getClip().duration;
         } else if (!over.external) {
@@ -155,13 +164,16 @@ export class KayKitModel {
       const wRun = smooth(this.walkPace * 1.1, this.runPace * 0.8, sp);
       const wMove = smooth(0.03, 0.14, sp);
       const idle = this.slot(this.clips.idle), walk = this.slot(this.clips.walk), run = this.slot(this.clips.run);
-      idle.target = 1 - wMove;
-      walk.target = wMove * (1 - wRun);
-      run.target = wMove * wRun;
       for (const a of [idle, walk, run]) { a.action.setLoop(THREE.LoopRepeat, Infinity); }
-      idle.action.timeScale = 1;
-      walk.action.timeScale = Math.max(0.5, sp / this.walkPace);
+      run.target = wMove * wRun;
       run.action.timeScale = Math.max(0.7, sp / this.runPace);
+      // modelos con un solo clip de avance (limos): caminar y correr son el mismo
+      if (walk !== run) {
+        walk.target = wMove * (1 - wRun);
+        walk.action.timeScale = Math.max(0.5, sp / this.walkPace);
+      } else walk.target = wMove;
+      idle.target = 1 - wMove;
+      idle.action.timeScale = 1;
     }
     // --- fundido de pesos (normalizados para no mezclar con la pose de reposo) ---
     const k = 1 - Math.exp(-dt / (over && over.scrub != null ? 0.05 : 0.11));
@@ -223,7 +235,9 @@ export class KayKitModel {
     if (this.flashT > 0) {
       this.flashT -= dt;
       const on = Math.floor(this.flashT * 30) % 2 === 0 && this.flashT > 0;
-      for (const m of this.materials) { m.emissive.copy(on ? this.flashColor : new THREE.Color(0)); m.emissiveIntensity = 0.8; }
+      for (const m of this.materials) {
+        if (on) { m.emissive.copy(this.flashColor); m.emissiveIntensity = 0.8; } else restoreEmissive(m);
+      }
     }
   }
 

@@ -5,6 +5,7 @@
 // pisotón) y 'darklord' (jefe final: tres fases, teletransporte, hechizos y escudo de
 // sombras que solo cae al destruir los cristales oscuros de la sala).
 import * as THREE from 'three';
+import { restoreEmissive } from './KayKitModel.js';
 import { ENEMIES } from '../data/enemies.js';
 import { buildEnemyModel } from './EnemyModels.js';
 import { dampAngle, angleDiff } from '../core/utils.js';
@@ -62,7 +63,10 @@ export class Enemy {
   /** Brillo de todos los materiales (destello al recibir golpe / aviso de ataque). */
   setEmissive(hex, intensity) {
     const mats = this.kk ? this.kk.materials : [this.mat];
-    for (const m of mats) { m.emissive.set(hex); m.emissiveIntensity = intensity; }
+    for (const m of mats) {
+      if (hex === 0 && this.kk) restoreEmissive(m); // ojos y cristales conservan su brillo
+      else { m.emissive.set(hex); m.emissiveIntensity = intensity; }
+    }
   }
 
   /** El esqueleto enterrado se levanta (invulnerable mientras tanto). */
@@ -122,6 +126,7 @@ export class Enemy {
     g.shake(0.6);
     g.particles.burst(this.pos.x, this.pos.y + 2, this.pos.z, { count: 40, color: this.def.phase2Color ?? 0xff4d2e, speed: 9, up: 5, life: 0.9 });
     if (this.cm) this.cm.material.color.setRGB(1.25, 0.8, 0.8);
+    else if (this.kk?.monster) for (const m of this.kk.materials) m.color.multiply(new THREE.Color(1.2, 0.85, 0.8));
     else if (this.kk) for (const m of this.kk.materials) m.color.setRGB(1.25, 0.85, 0.75);
     else this.mat.color.setRGB(0.85, 1.05, 1.3);
     // invoca refuerzos a los lados
@@ -268,6 +273,19 @@ export class Enemy {
     if (this.cool > 0) this.cool -= dt;
 
     if (this.state === 'dead') {
+      if (this.kk?.monster) {
+        // el monstruo cae (los voladores bajan al suelo) y se deshace en una nube
+        const k = this.stateT / 0.8;
+        this.kk.animate(dt, { dead: Math.min(1, k) });
+        this.body.position.y *= Math.exp(-dt * 6);
+        if (k > 1) this.root.scale.setScalar(Math.max(0.01, 1 - (k - 1) * 1.6));
+        if (k > 1 && !this.puffed) {
+          this.puffed = true;
+          this.game.particles.burst(this.pos.x, this.pos.y + 0.6, this.pos.z, { count: 22, color: this.def.monster.puff ?? 0xdddddd, speed: 3, up: 2, life: 0.8, size: 1.8 });
+        }
+        if (k >= 1.6) this.removed = true;
+        return;
+      }
       if (this.kk) {
         // el esqueleto se desmorona y la arena se lo traga
         const k = this.stateT / 0.9;
@@ -478,7 +496,7 @@ export class Enemy {
     this.root.position.set(this.pos.x, this.pos.y, this.pos.z);
     this.root.rotation.y = this.facing;
     m.face?.blink(dt);
-    const model = this.def.model;
+    const model = this.kk ? 'kaykit' : this.def.model;
     if (model === 'slime') {
       let sq = 1 + Math.sin(t * 6) * 0.06, hop = 0;
       if (this.state === 'windup') sq = 0.7;
@@ -567,6 +585,7 @@ export class Enemy {
       if (this.state === 'stun') st.action = { name: c.stun || 'Hit_B', t: Math.min(0.55, this.stateT / 0.6) };
       if (this.shielded && (this.state === 'chase' || this.state === 'recover')) st.action = { name: c.shielded || 'Spellcasting', loop: true };
       if (this.shieldMesh?.visible) this.shieldMesh.material.opacity = 0.18 + Math.sin(this.game.time * 4) * 0.06;
+      if (this.kk.monster) this.monsterMotion(t, dt);
       this.kk.lookTarget = this.state === 'chase' || this.state === 'windup' ? (this._lt || (this._lt = new THREE.Vector3())).set(this.game.player.x, this.game.player.pos.y + 1.4, this.game.player.z) : null;
       this.kk.animate(dt, st);
     } else if (this.cm) {
@@ -574,6 +593,23 @@ export class Enemy {
       if (this.state === 'windup') attack = { t: Math.min(0.25, this.stateT * 0.6), combo: 2 };
       if (this.state === 'attack') attack = { t: 0.25 + Math.min(0.75, this.stateT / 0.35), combo: 2 };
       this.cm.animate(dt, { speed: moveSpeed / 3, attack, hurt: this.state === 'hurt' });
+    }
+  }
+
+  /** Movimiento extra de los monstruos: vuelo con vaivén, picados, saltos de los limos, estela. */
+  monsterMotion(t, dt) {
+    const mo = this.def.monster;
+    let y = 0;
+    if (this.def.flying) {
+      y = this.flyY + Math.sin(t * 3) * 0.25;
+      if (this.ai === 'swoop' && this.state === 'attack') y = THREE.MathUtils.lerp(this.flyY, 0.9, Math.sin(Math.min(1, this.stateT / 0.55) * Math.PI));
+    }
+    // limos: botan al avanzar y saltan sobre el héroe al atacar
+    if (mo.hop && this.state === 'attack') y = Math.sin(Math.min(1, this.stateT / 0.35) * Math.PI) * mo.hop;
+    const k = 1 - Math.exp(-dt * 10);
+    this.body.position.y += (y - this.body.position.y) * k;
+    if (mo.trail && Math.random() < dt * 6) {
+      this.game.particles.spawn(this.pos.x, this.pos.y + this.body.position.y + 0.2, this.pos.z, { color: mo.trail, size: 0.5, life: 0.8, gravity: 0.5, vx: (Math.random() - 0.5), vz: (Math.random() - 0.5) });
     }
   }
 
