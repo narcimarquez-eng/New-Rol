@@ -297,7 +297,7 @@ const MODS = {
     const h = hit(scene, new THREE.Vector3(hp.x, box.max.y + 1, hp.z), new THREE.Vector3(0, -1, 0));
     const size = box.max.y - box.min.y;
     if (h) {
-      const c = crown(size * 0.13);
+      const c = crown(size * 0.19);
       c.position.copy(h.point).add(new THREE.Vector3(0, size * 0.015, 0));
       c.rotation.x = -0.12;
       scene.add(c); c.updateMatrixWorld(true);
