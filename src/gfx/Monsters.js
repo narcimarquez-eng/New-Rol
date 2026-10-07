@@ -335,6 +335,17 @@ const MODS = {
       const h = hit(scene, new THREE.Vector3(p.x * 1.25, box.max.y + 1, p.z - d * 0.08), new THREE.Vector3(0, -1, 0));
       if (h) stud(scene, h, crystalCluster(size * 0.15, mat, 3), { tilt: 0.5, sink: size * 0.01 });
     }
+    // guanteletes de hielo: cristales por fuera de los antebrazos
+    for (const side of ['L', 'R']) {
+      const arm = scene.getObjectByName(`LowerArm${side}`);
+      if (!arm) continue;
+      const p = arm.getWorldPosition(new THREE.Vector3());
+      const sx = Math.sign(p.x) || 1;
+      for (const dy of [-0.06, -0.12]) {
+        const h = hit(scene, new THREE.Vector3(p.x + sx * size, p.y + dy * size, p.z), new THREE.Vector3(-sx, 0, 0));
+        if (h) stud(scene, h, crystalCluster(size * 0.11, mat, 2), { tilt: 0.8, sink: size * 0.01 });
+      }
+    }
     const head = scene.getObjectByName('Head').getWorldPosition(new THREE.Vector3());
     const hh = hit(scene, new THREE.Vector3(head.x, box.max.y + 1, head.z - d * 0.1), new THREE.Vector3(0, -1, 0));
     if (hh) stud(scene, hh, crystalCluster(size * 0.12, mat, 2), { tilt: 0.3, sink: size * 0.01 });
