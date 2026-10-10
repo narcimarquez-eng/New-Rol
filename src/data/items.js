@@ -33,4 +33,9 @@ export const ITEMS = {
   package: { name: 'Paquete del herrero', kind: 'quest', color: 0xb8864b, icon: '📦', desc: 'Entrégaselo al granjero Tomás.' },
   axe: { name: 'Hacha del leñador', kind: 'quest', color: 0x9a9a9a, icon: '🪓', desc: 'El hacha perdida de Íñigo.' },
   wisp: { name: 'Luz del bosque', kind: 'quest', color: 0x9fffd0, icon: '✨', desc: 'Una lucecita cálida. El hada Lys las colecciona.' },
+  // ---- Volcán Ardiente ----
+  key_volcano: { name: 'Llave del Volcán', kind: 'key', color: 0xff5a1f, icon: '🌋', desc: 'Una llave de obsidiana roja, caliente al tacto. Abre la Puerta del Cráter.' },
+  ember: { name: 'Brasa de magma', kind: 'quest', color: 0xff7a20, icon: '🔥', desc: 'Una brasa que nunca se apaga. Hana la necesita para encender su forja.' },
+  obsidian: { name: 'Obsidiana', kind: 'quest', color: 0x4a3a5a, icon: '🖤', desc: 'Vidrio negro de volcán, afilado como una navaja. Teo lo colecciona.' },
+  water_flask: { name: 'Frasco de agua fresca', kind: 'quest', color: 0x7fd6ff, icon: '💧', desc: 'Agua de la fuente del pie del volcán. Es para Teo, que se ha quedado sin nada.' },
 };

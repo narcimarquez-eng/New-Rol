@@ -12,6 +12,7 @@ export const COMPANIONS = {
     side: -1, // se coloca a la izquierda y algo detrás del héroe
     mapColor: '#3fc46f',
     lines: ['Rápido y en silencio. Así se cruza el desierto.', 'Te cubro la espalda.', 'Esos esqueletos no se quedan muertos mucho tiempo... ¡No bajes la guardia!'],
+    farewell: ['Rápido y en silencio, así te he seguido desde el desierto. Ahora te toca ir solo.', 'Me quedo en los tejados, vigilando el camino del norte. Si el humo del volcán llega aquí, lo sabré antes que nadie.', 'Cuídate, forastero. Y no me hagas buscarte.'],
   },
   aldric: {
     name: 'Sir Aldric',
@@ -23,6 +24,7 @@ export const COMPANIONS = {
     side: 1,
     mapColor: '#9fb4d8',
     lines: ['¡Por el reino!', 'Este castillo fue mi hogar. Lo recuperaremos.', 'Malakar espera en la sala del trono. Necesitamos los tres sellos.'],
+    farewell: ['El castillo empieza a reconstruirse, y sus caballeros volverán a ocupar sus puestos.', 'Yo me quedo en la puerta de la aldea. Este pueblo también es parte del reino.', 'Por el reino, amigo. Vuelve con vida.'],
   },
   cedric: {
     name: 'Sir Cedric',
@@ -34,6 +36,7 @@ export const COMPANIONS = {
     side: -1,
     mapColor: '#5ad18a',
     lines: ['Mi familia sirvió en este castillo durante cinco generaciones.', '¡Con los estandartes del reino a nuestro lado!', 'Cuidado con los hechiceros: atacan de tres en tres.'],
+    farewell: ['Mi familia sirvió en el castillo durante cinco generaciones. Ahora sirve a esta aldea.', 'Ayudaré a Tomás con la cosecha mientras tú te enfrentas al volcán.', 'Cuando vuelvas, te esperaré con la mesa puesta. Eso te lo prometo.'],
   },
   borg: {
     name: 'Borg',
@@ -45,5 +48,6 @@ export const COMPANIONS = {
     side: 1,
     mapColor: '#d9853b',
     lines: ['¡JA! ¡Que vengan más!', 'Mi hacha tiene sed... de arena no, de esqueletos.', 'Cuando volvamos a la aldea, invito yo a la taberna.'],
+    farewell: ['Esto es cosa tuya, amigo. Yo me quedo a cuidar la aldea y la taberna de Rosa.', 'Cuando vuelvas, la taberna invita. Y no me hagas esperar, que el hacha se me oxida.', '¡Venga, que ya te echo de menos! ¡Anda, vete!'],
   },
 };

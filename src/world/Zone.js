@@ -17,6 +17,7 @@ import { buildAtmosphere, buildRealWater } from '../gfx/Environment.js';
 import { buildBackdrop } from '../gfx/Backdrop.js';
 import { treeInstances, variedTrees, barkMat, endGrainMat } from '../gfx/Vegetation.js';
 import { triplanar, rockTextures, woodTextures, snowTextures, iceMaterialReal } from '../gfx/Materials.js';
+import { lavaMaterial } from '../gfx/Lava.js';
 import { sandTextures } from '../gfx/Textures.js';
 import { tex } from '../gfx/Textures.js';
 
@@ -108,7 +109,7 @@ export class Zone {
     this.group.add(outer);
 
     // agua (solo visible donde el terreno está hundido)
-    const hasWater = this.map.some((row) => /[~B]/.test(row));
+    const hasWater = this.map.some((row) => /~/.test(row));
     if (hasWater) {
       const water = buildWater(this.W * TILE, this.H * TILE, pal, this.terrain, -0.55);
       water.position.y = -0.55;
@@ -130,7 +131,7 @@ export class Zone {
     // montañas y valle alrededor del mapa (sustituyen al suelo exterior)
     this.group.add(buildBackdrop(this.W * TILE / 2, this.H * TILE / 2, { seed: this.data.terrain?.seed ?? 7, ...(atmo.backdrop || {}) }));
     // agua con reflejos
-    if (this.map.some((row) => /[~B]/.test(row))) {
+    if (this.map.some((row) => /~/.test(row))) {
       const water = buildRealWater(this.W * TILE, this.H * TILE, atmo, this.sunDir, { level: -0.55, lowQuality: !this.quality.high });
       this.group.add(water);
       this.updaters.push((t) => water.userData.update(t));
@@ -141,7 +142,7 @@ export class Zone {
   /** Recorre el mapa y genera las mallas instanciadas por tipo de objeto. */
   buildTiles() {
     const pal = this.palette;
-    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [], ruin: [], column: [], cactus: [], palm: [], scrub: [], castlewall: [], tower: [] };
+    const lists = { tree: [], pine: [], rock: [], bush: [], wall: [], wallTree: [], cliff: [], fenceX: [], fenceZ: [], flowers: [], tufts: [], bridge: [], secret: [], secretTree: [], crystal: [], icepillar: [], iceSheet: [], lava: [], ruin: [], column: [], cactus: [], palm: [], scrub: [], castlewall: [], tower: [] };
     const rockWalls = this.data.wallStyle === 'rock';
     const r = rng(this.data.terrain?.seed ?? 1);
     this.bushIndex = new Map(); // "c,r" -> índice de instancia
@@ -196,6 +197,7 @@ export class Zone {
           default: break;
         }
         if (info.ice) lists.iceSheet.push({ x, y: this.height(x, z) + 0.04, z, ry: Math.floor(hash2(c, row, 9) * 4) * Math.PI / 2 });
+        if (info.lava) lists.lava.push({ x, y: -0.5, z, ry: 0 }); // superficie de la lava; el lecho se hunde bajo ella (waterDepth)
         if (occ) continue;
         if (info.decor === 'flowers') {
           for (let k = 0; k < 6; k++) lists.flowers.push({ x: x + (r() - 0.5) * 3.6, y, z: z + (r() - 0.5) * 3.6, s: 0.8 + r() * 0.6, color: flowerColors[Math.floor(r() * flowerColors.length)] });
@@ -261,8 +263,15 @@ export class Zone {
       const sheet = P.instanced(new THREE.PlaneGeometry(TILE, TILE).rotateX(-Math.PI / 2), iceMaterial(), lists.iceSheet, { castShadow: false });
       this.group.add(sheet);
     }
+    this.addLava(lists);
     // hierba con viento
     if (pal.grassDensity !== 0) this.group.add(buildGrass(this, Math.round((pal.grassDensity ?? 48) * (high ? 1 : 0.4))));
+  }
+
+  /** Lava incandescente de los lagos del volcán (la usan los dos modos de render). */
+  addLava(lists) {
+    if (!lists.lava.length) return;
+    this.group.add(P.instanced(new THREE.PlaneGeometry(TILE, TILE).rotateX(-Math.PI / 2), lavaMaterial(), lists.lava, { castShadow: false, receiveShadow: false }));
   }
 
   /** Vegetación y objetos del modo realista (árboles ez-tree, roca triplanar, madera...). */
@@ -345,6 +354,7 @@ export class Zone {
       ice.name = 'ice';
       this.group.add(ice);
     }
+    this.addLava(lists);
     if (pal.grassDensity !== 0) this.group.add(buildGrass(this, Math.round((pal.grassDensity ?? 48) * (this.quality.high ? 1.6 : 0.5))));
   }
 

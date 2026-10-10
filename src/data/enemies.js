@@ -162,4 +162,34 @@ export const ENEMIES = {
     phase2Text: '¡El Rey de las Arenas levanta a sus súbditos de la arena!', phase2Color: 0xe0b030, summon: 'skeletonMinion', summonCount: 3,
     drops: [['heart_container', 1]],
   },
+
+  // ---------- Volcán Ardiente ----------
+  // Criaturas de lava y ceniza: modelos procedurales coloreados de ascuas.
+  lavaSlime: {
+    name: 'Limo de lava', model: 'slime', hp: 4, dmg: 1, speed: 2.6, sight: 10, attackRange: 1.4, radius: 0.7,
+    cooldown: 1.2, knockback: 6, color: 0xff5a1a,
+    drops: [['coin', 0.5], ['ember', 0.45]],
+  },
+  ashBat: {
+    name: 'Murciélago de ceniza', model: 'bat', hp: 3, dmg: 1, speed: 4.6, sight: 12, attackRange: 1.4, radius: 0.5,
+    cooldown: 1.4, knockback: 8, flying: true, color: 0x5a2a20,
+    drops: [['coin', 0.5], ['heart', 0.25]],
+  },
+  emberSpirit: {
+    name: 'Espíritu de ascuas', model: 'spirit', ai: 'ranged', hp: 5, dmg: 2, speed: 2.4, sight: 15, attackRange: 12, preferDist: 8,
+    radius: 0.6, cooldown: 2.6, windup: 0.7, knockback: 5, flying: true, flyHeight: 1.3, color: 0xff7a2a,
+    projectile: { speed: 10, size: 0.32, color: 0xffa040 },
+    drops: [['ember', 0.6], ['coin5', 0.4]],
+  },
+  ashGoblin: {
+    name: 'Trasgo de ceniza', model: 'goblin', hp: 6, dmg: 2, speed: 3.1, sight: 12, attackRange: 2.0, radius: 0.6,
+    cooldown: 1.4, windup: 0.45, knockback: 5, color: 0x5a4438,
+    drops: [['coin5', 0.4], ['ember', 0.3]],
+  },
+  ignar: {
+    name: 'Ignar, el Coloso de Magma', model: 'golem', ai: 'golem', hp: 84, dmg: 3, speed: 2.2, sight: 22, attackRange: 4.6, radius: 1.8,
+    cooldown: 1.3, windup: 0.75, knockback: 0.4, boss: true, color: 0x3a2622,
+    phase2Text: '¡Ignar se agrieta y arde por dentro! Llama a sus limos de lava.', phase2Color: 0xff6a1a, summon: 'lavaSlime', summonCount: 2,
+    drops: [['heart_container', 1]],
+  },
 };

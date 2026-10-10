@@ -345,6 +345,8 @@ export class Game {
       this.audio.playMusic(data.music);
       this.ui.zoneTitle(data.name, data.subtitle);
       if (data.enterFlag) this.progress.flags.add(data.enterFlag);
+      // al volver a la aldea (fase 5), los compañeros se despiden antes de que el héroe siga solo
+      if (id === 'village') this.scheduleFarewell();
       this.save();
     }
   }
@@ -355,7 +357,8 @@ export class Game {
     this.companions = [];
     if (!charactersReady()) return;
     Object.keys(COMPANIONS).forEach((id) => {
-      if (!this.progress.flags.has(`companion_${id}`)) return;
+      // quien se ha despedido se queda en la aldea y ya no sigue al héroe
+      if (!this.progress.flags.has(`companion_${id}`) || this.progress.flags.has(`farewell_${id}`)) return;
       const c = new Companion(this, id, this.companions.length);
       this.companions.push(c);
       this.scene.add(c.root);
@@ -379,6 +382,61 @@ export class Game {
     if (c && npc) { c.pos.set(npc.x, npc.y, npc.z); c.facing = npc.facing; }
     this.audio.sfx('quest');
     this.ui.toast(`¡${def.name} ${def.title} se une a tu grupo!`);
+  }
+
+  // ------------------------------------------------------------------ despedida (fase 5)
+  /** Programa la despedida al estar en la aldea (un solo temporizador a la vez). */
+  scheduleFarewell(delay = 1200) {
+    if (this.farewellTimer) return;
+    this.farewellTimer = setTimeout(() => {
+      this.farewellTimer = null;
+      const pending = this.zone?.id === 'village' && this.progress.check({ flag: 'phase5_start', notFlag: 'farewell_done' });
+      if (!pending) return;
+      // espera a que acabe el fundido de la entrada y a que el héroe no tenga otra cosa abierta
+      if (this.transitioning || this.mode !== 'play') return this.scheduleFarewell(250);
+      this.runFarewell();
+    }, delay);
+  }
+
+  /** Cada compañero del grupo dice su despedida, uno tras otro, con el héroe mirándole. */
+  runFarewell() {
+    const pr = this.progress;
+    const members = Object.keys(COMPANIONS).filter((id) => pr.flags.has(`companion_${id}`) && !pr.flags.has(`farewell_${id}`));
+    const say = (i) => {
+      if (i >= members.length) return this.endFarewell(members);
+      const id = members[i], def = COMPANIONS[id];
+      const c = this.companions.find((k) => k.id === id);
+      this.setMode('dialog'); // el diálogo siguiente se abre al cerrarse el anterior: hay que volver a bloquear el juego
+      if (c) this.lookTarget = new THREE.Vector3(c.x, c.pos.y + 1.4, c.z);
+      this.ui.openDialog(def.name, def.farewell, { onEnd: () => say(i + 1) });
+    };
+    say(0);
+  }
+
+  /** Tras las despedidas: cada compañero se queda en la aldea donde está y el héroe sigue solo. */
+  endFarewell(members) {
+    const pr = this.progress;
+    const entities = this.zone.data.entities;
+    for (const id of members) {
+      pr.flags.add(`farewell_${id}`);
+      const c = this.companions.find((k) => k.id === id);
+      if (!c) continue;
+      this.particles.puff(c.x, c.pos.y + 1, c.z, { color: 0xffffff, count: 24, size: 2.2 });
+      // el NPC de la aldea aparece en el mismo sitio y mirando al mismo lado
+      const e = entities.find((x) => x.type === 'npc' && x.id === id);
+      if (e) this.addInteractable(new NPC(this, { ...e, tile: this.worldToTile(c.x, c.z), facing: c.facing }));
+    }
+    pr.flags.add('farewell_done');
+    this.spawnCompanions();
+    this.audio.sfx('quest');
+    this.ui.toast('Tus amigos se quedan en la aldea. Ahora sigues solo.');
+    this.save();
+  }
+
+  /** Casilla (con decimales) de una posición del mundo, para colocar algo exactamente ahí. */
+  worldToTile(x, z) {
+    const zn = this.zone;
+    return [(x + zn.W * TILE / 2) / TILE - 0.5, (z + zn.H * TILE / 2) / TILE - 0.5];
   }
 
   addInteractable(it) {
@@ -784,6 +842,13 @@ export class Game {
         const a = Math.random() * Math.PI * 2, d = Math.random() * 22;
         this.particles.spawn(p.x + Math.cos(a) * d, p.pos.y + 7 + Math.random() * 4, p.z + Math.sin(a) * d, { color: 0xffffff, size: 0.45 + Math.random() * 0.3, life: 4, gravity: 0.6, vx: 0.6 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.5, drag: 0.3 });
       }
+    }
+    // ascuas que suben desde el suelo del volcán
+    if (this.zone.data.ambient === 'embers' && Math.random() < dt * 14) {
+      const p = this.player;
+      const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 16;
+      const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+      this.particles.spawn(x, this.zone.height(x, z) + 0.3, z, { color: Math.random() < 0.6 ? 0xff7a20 : 0xffc040, size: 0.3, life: 3, gravity: -0.35, vx: (Math.random() - 0.5) * 0.8, vz: (Math.random() - 0.5) * 0.8, drag: 0.25 });
     }
     if (this.zone.data.ambient === 'fireflies' && Math.random() < dt * 12) {
       const p = this.player;

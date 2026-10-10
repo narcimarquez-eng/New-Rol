@@ -43,6 +43,9 @@ export const TILES = {
   'm': { ground: 'flagstone', prop: 'castlewall', secret: true }, // muro falso: se atraviesa
   'U': { ground: 'cobble', solid: 'circle', radius: 2.0, tall: true, height: 11, prop: 'tower' },
   'q': { ground: 'cobble' },
+  // ---- Volcán Ardiente ----
+  'a': { ground: 'ash' }, // ceniza: suelo liso y sin flores
+  'L': { ground: 'water', solid: 'box', water: true, lava: true }, // lava incandescente (ver gfx/Lava.js)
 };
 
 export const DEFAULT_TILE = TILES['.'];

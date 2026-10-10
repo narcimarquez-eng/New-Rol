@@ -238,7 +238,7 @@ add({'type': 'door', 'id': 'k_balcony', 'tile': [27, 1], 'span': 2, 'style': 'st
      'lockedText': 'Una puerta sellada por la magia de Malakar.'})
 add({'type': 'portal', 'tile': [27, 0], 'span': 2, 'to': 'credits', 'flag': 'game_complete', 'label': 'Balcón del reino',
      'ending': {'title': '¡Has salvado el reino!', 'tagline': 'Malakar ha caído y la luz vuelve al castillo.',
-                'text': 'Desde el balcón, el reino entero celebra tu victoria. Kael, Borg, Sir Aldric y Sir Cedric levantan sus armas en tu honor.<br/><b>¡Gracias por jugar a New Rol!</b>'}})
+                'text': 'Desde el balcón, el reino entero celebra tu victoria. Kael, Borg, Sir Aldric y Sir Cedric levantan sus armas en tu honor.<br/><b>Pero en el horizonte se alza una columna de humo: el volcán despierta…</b>'}})
 # Ala del Cristal
 add({'type': 'sign', 'tile': [10, 41], 'text': 'ALA DEL CRISTAL\nGolpea los cristales: las barreras rojas y azules se alternan.\nDespués, dos bloques y dos placas.'})
 for (c, r), col in barriers.items():

@@ -37,5 +37,13 @@ export const STORY = [
   { until: { flag: 'opened_k_gate' }, text: 'Abre la Gran Puerta de la antesala con los tres sellos.' },
   { until: { flag: 'boss_castle' }, text: 'Derrota a Malakar, el Rey Sombrío, en la sala del trono.' },
   { until: { flag: 'game_complete' }, text: 'Sal al balcón del trono: el reino te espera.' },
+  // ---- Fase 5: Volcán Ardiente ----
+  { until: { flag: 'phase5_start' }, text: 'Usa el portal de la sala del trono para volver a la Aldea Inicial.' },
+  { until: { flag: 'farewell_done' }, text: 'Despídete de tus amigos en la plaza de la aldea.' },
+  { until: { flag: 'entered_volcano' }, text: 'Sigue el sendero del noreste, tras la granja de Tomás, hacia el Volcán Ardiente. Irás solo.' },
+  { until: { any: [{ has: 'key_volcano' }, { flag: 'opened_v_crater' }] }, text: 'Cruza el río de lava por el puente y encuentra la Llave del Volcán: está tras un muro falso, en el campamento del oeste.' },
+  { until: { flag: 'opened_v_crater' }, text: 'Lleva la Llave del Volcán a la Puerta del Cráter, al norte del plateau.' },
+  { until: { flag: 'boss_volcano' }, text: 'Derrota a Ignar, el Coloso de Magma, en el corazón del cráter.' },
+  { until: { flag: 'volcano_complete' }, text: 'Sal del cráter: el volcán vuelve a dormir.' },
   { until: null, text: '¡Has salvado el reino! Gracias por jugar.' },
 ];

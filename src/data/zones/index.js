@@ -8,9 +8,10 @@ import shrineForest from './shrine_forest.js';
 import shrineIce from './shrine_ice.js';
 import shrineSun from './shrine_sun.js';
 import castle from './castle.js';
+import volcano from './volcano.js';
 
 export const ZONES = {
-  village, forest, caves, desert, castle,
+  village, forest, caves, desert, castle, volcano,
   // santuarios de las pruebas mágicas
   shrine_forest: shrineForest, shrine_ice: shrineIce, shrine_sun: shrineSun,
 };

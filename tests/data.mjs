@@ -41,5 +41,29 @@ for (const z of Object.values(ZONES)) {
   ok(kinds.size >= 3, `${z.id}: ${kinds.size} tipos de enemigo (>= 3)`);
   ok(z.entities.some((e) => e.type === 'chest' && e.secret), `${z.id}: tiene cofres secretos`);
 }
+// accesibilidad (fase 5): desde la aparición se llega a todo lo que hay que visitar.
+// Puertas y muros falsos cuentan como paso (se abren o se atraviesan en la partida).
+for (const id of ['volcano']) {
+  const z = ZONES[id];
+  const cell = (c, r) => TILES[z.map[r]?.[c]] || { solid: 'box' };
+  const pass = (c, r) => { const t = cell(c, r); return !t.solid || !!t.cuttable; };
+  const sp = z.entities.find((e) => e.type === 'spawn');
+  const key = (c, r) => `${c},${r}`;
+  const seen = new Set([key(Math.floor(sp.tile[0]), Math.floor(sp.tile[1]))]);
+  const queue = [[Math.floor(sp.tile[0]), Math.floor(sp.tile[1])]];
+  while (queue.length) {
+    const [c, r] = queue.shift();
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nr < 0 || nr >= z.map.length || nc >= z.map[0].length || seen.has(key(nc, nr)) || !pass(nc, nr)) continue;
+      seen.add(key(nc, nr)); queue.push([nc, nr]);
+    }
+  }
+  for (const e of z.entities) {
+    if (!['npc', 'chest', 'enemy', 'pickup', 'sign', 'portal', 'door'].includes(e.type)) continue;
+    const cands = [[Math.floor(e.tile[0]), Math.floor(e.tile[1])], [Math.floor(e.tile[0] + 0.5), Math.floor(e.tile[1] + 0.5)]];
+    ok(cands.some(([c, r]) => seen.has(key(c, r))), `${z.id}: ${e.type} ${e.id || e.kind || e.to || ''} alcanzable desde la aparición`);
+  }
+}
 console.log(fails ? `\n${fails} fallos` : '\nDatos correctos ✔');
 process.exit(fails ? 1 : 0);

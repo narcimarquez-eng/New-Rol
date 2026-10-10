@@ -3,6 +3,8 @@
 // paleta, música y entidades colocadas por casilla [columna, fila].
 // Generado/editado con tools/genmaps.py.
 
+import { COMPANIONS } from '../companions.js';
+
 const NPC_LOOKS = {
   elder: { tunic: 0x6a4c93, hair: 0xeeeeee, hat: 0x6a4c93, hatStyle: 'hood', beard: 0xeeeeee, pants: 0x4b3a6b, face: 'old', staff: 0x9fe7ff },
   lucia: { tunic: 0xe76f51, hair: 0x6b3e26, hatStyle: 'bun', pants: 0xf4e1c1, apron: 0xffffff, face: 'girl', eyes: '#3a7d44' },
@@ -36,7 +38,7 @@ export default {
   trees: ['oak', 'cherry'],
   music: { root: 60, scale: [0, 2, 4, 5, 7, 9, 11], tempo: 92, prog: [0, 3, 4, 0, 5, 3, 4, 4], lead: 'square', pad: 'sine' },
   map: [
-    '^^^^^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^',
+    '^^^^^^^^^^^^^^^^^==^^^^^^^^^^^^==^^^',
     '^..........######==######..F,,,,,,,^',
     '^..........######==######..F,,,,,,,^',
     '^..............T.==T...,...F,,,,,,,^',
@@ -75,6 +77,8 @@ export default {
     // --- puntos de aparición ---
     { type: 'spawn', id: 'start', tile: [17.5, 21], facing: Math.PI },
     { type: 'spawn', id: 'fromForest', tile: [17.5, 4], facing: 0 },
+    { type: 'spawn', id: 'fromCastle', tile: [18, 16], facing: 0 },   // regreso desde el castillo (fase 5): la plaza
+    { type: 'spawn', id: 'fromVolcano', tile: [31, 3], facing: 0 },   // regreso desde el volcán: la granja
 
     // --- casas ---
     { type: 'house', tile: [5, 5], size: [2, 2], roof: 0x3a6fc0 },
@@ -102,6 +106,7 @@ export default {
           '¡Que la luz te guíe!',
         ], do: [{ flag: 'tutorial_done' }, { give: ['potion', 2] }, { give: ['coin', 20] }] },
         { when: { notFlag: 'boss_forest' }, lines: ['El bosque está al norte. Si te pierdes en el laberinto, sigue las antorchas.', 'Y no olvides ayudar a los vecinos: siempre tienen algo que agradecerte.'] },
+        { when: { flag: 'phase5_start' }, lines: ['El humo del volcán del noreste se ve desde la aldea. Los pájaros han dejado de cantar.', 'Ve con cuidado, y vuelve a casa cuando acabes.'] },
         { lines: ['¡Has derrotado al Rey Trasgo! La aldea entera habla de ti.', 'Las Cuevas Heladas te esperan más allá del bosque...'] },
       ],
     },
@@ -130,12 +135,30 @@ export default {
         { lines: ['El Anciano confía en ti. ¡Buena suerte en el bosque!', 'Cuidado con los trasgos: levantan la porra antes de golpear. ¡Bloquea o esquiva en ese momento!'] },
       ] },
 
+    // --- compañeros que se quedan en la aldea tras su despedida (fase 5) ---
+    // (al despedirse, cada uno ocupa su sitio exacto; estas posiciones son las de las siguientes visitas)
+    { type: 'npc', id: 'kael', name: 'Kael', tile: [13, 13], kaykit: COMPANIONS.kael.look, facing: 0, when: { flag: 'farewell_kael' },
+      look: { tunic: 0x3a3a4a, hair: 0x222222, hat: 0x3a3a4a, hatStyle: 'hood', pants: 0x2a2a2a, face: 'npc' },
+      talk: [{ lines: ['Vigilo el camino del norte desde los tejados. Si el humo del volcán se acerca, avísame.'] }] },
+    { type: 'npc', id: 'cedric', name: 'Sir Cedric', tile: [18, 18], kaykit: COMPANIONS.cedric.look, facing: Math.PI, when: { flag: 'farewell_cedric' },
+      look: { tunic: 0x9aa4b0, hair: 0xe8c86a, pants: 0x5a5a6a, face: 'npc' },
+      talk: [{ lines: ['Ayudo a Tomás con las calabazas. La cosecha no se detiene, ni aunque tiemble la montaña.'] }] },
+    { type: 'npc', id: 'aldric', name: 'Sir Aldric', tile: [21, 17], kaykit: COMPANIONS.aldric.look, facing: -Math.PI / 2, when: { flag: 'farewell_aldric' },
+      look: { tunic: 0x9aa4b0, hair: 0x6b4a2a, hat: 0x9aa4b0, hatStyle: 'helmet', pants: 0x5a5a6a, face: 'npc' },
+      talk: [{ lines: ['La guardia de la aldea es mía ahora. Tú ve, que el volcán no espera.'] }] },
+    { type: 'npc', id: 'borg', name: 'Borg', tile: [21, 15], kaykit: COMPANIONS.borg.look, facing: -Math.PI / 2, when: { flag: 'farewell_borg' },
+      look: { tunic: 0x8a5a3a, hair: 0x6b3a1a, hatStyle: 'none', pants: 0x4a3a2a, beard: 0x6b3a1a, face: 'npc', scale: 1.1 },
+      talk: [{ lines: ['La taberna abre cuando vuelvas. Mientras, ayudo a Rosa con los barriles.'] }] },
+
     // --- puertas y transiciones ---
     { type: 'door', id: 'v_gate', tile: [17, 2], span: 2, requires: { flag: 'tutorial_done' }, auto: true,
       lockedText: 'La puerta norte está cerrada. El Anciano Bruno tiene que dar permiso.' },
     { type: 'door', id: 'v_garden_door', tile: [31, 4], span: 1, requires: { item: 'key_small' }, consume: true,
       lockedText: 'Una puerta de jardín cerrada con llave. Necesitas una llave pequeña.' },
     { type: 'portal', tile: [17, 0], span: 2, to: 'forest', spawn: 'fromVillage', label: 'Bosque Encantado' },
+    // sendero del volcán (fase 5): tras la granja, solo cuando los amigos se han despedido
+    { type: 'portal', tile: [31, 0], span: 2, to: 'volcano', spawn: 'fromVillage', label: 'Volcán Ardiente', when: { flag: 'phase5_start' }, requires: { flag: 'farewell_done' },
+      lockedText: 'El sendero del volcán está cubierto de ceniza. Antes, despídete de tus amigos.' },
 
     // --- cofres ---
     { type: 'chest', id: 'v_meadow', tile: [32, 31], item: 'key_small', facing: Math.PI },

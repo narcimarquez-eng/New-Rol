@@ -50,6 +50,11 @@ const npcs = [
     ] }] },
 ];
 
+// Tras el final (Malakar derrotado), un portal aparece en la sala del trono y lleva
+// de vuelta a la Aldea Inicial: el inicio de la fase 5 (el volcán).
+const returnPortal = { type: 'portal', tile: [27, 11], span: 2, to: 'village', spawn: 'fromCastle', flag: 'phase5_start',
+  when: { flag: 'game_complete' }, label: 'Aldea Inicial' };
+
 export default {
   id: 'castle',
   name: 'Castillo Final',
@@ -80,5 +85,5 @@ export default {
   torchIntensity: 9,
   music: { root: 50, scale: [0, 2, 3, 5, 7, 8, 11], tempo: 78, prog: [0, 5, 3, 4, 0, 5, 6, 4], lead: 'sawtooth', pad: 'triangle' },
   map,
-  entities: [...entities, ...npcs],
+  entities: [...entities, ...npcs, returnPortal],
 };

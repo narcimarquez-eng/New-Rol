@@ -10,8 +10,9 @@ y tierra también vienen de fuera (todo libre, ver [Créditos](#créditos)).
 **▶ Jugar:** https://narcimarquez-eng.github.io/new-rol/
 
 > **Juego completo**: Fase **1** (motor, Aldea Inicial, Bosque Encantado), **2** (Cuevas Heladas),
-> **3** (Desierto Perdido, héroe animado y compañeros) y **4** (pruebas mágicas, tres
-> santuarios y el **Castillo Final** con el jefe Malakar).
+> **3** (Desierto Perdido, héroe animado y compañeros), **4** (pruebas mágicas, tres
+> santuarios y el **Castillo Final** con el jefe Malakar) y **5** (el **Volcán Ardiente**, una
+> aventura en solitario tras despedirte de tus amigos).
 > Estilo visual realista (PBR) por defecto; añade `?toon` a la URL para el estilo ilustrado.
 
 ## Instalar en el móvil o el ordenador (sin tienda de apps)
@@ -149,6 +150,24 @@ primera visita guarda el juego). Al publicar una versión nueva, se actualiza so
   `tools/gen_castle.py`, que **comprueban con solucionadores** que cada prueba tiene solución
   (y que no viene resuelta) y sacan la secuencia de movimientos que usan los tests.
 
+### Contenido de la Fase 5
+
+- **Regreso a la aldea**: tras vencer a Malakar, un portal de la sala del trono lleva de vuelta
+  a la **Aldea Inicial**. Al llegar, **Kael**, **Sir Aldric**, **Sir Cedric** y **Borg** se
+  despiden del héroe uno a uno, y se quedan en el pueblo como habitantes (cada uno en el sitio
+  donde estaba). Desde ese momento el héroe sigue **solo**.
+- **Sendero del volcán**: un camino nuevo al noreste de la aldea, tras la granja de Tomás,
+  que se abre al despedirse de los amigos.
+- **Volcán Ardiente**: cuenca de ceniza, ladera con limos de lava, murciélagos de ceniza, espíritus
+  de ascuas y trasgos de ceniza. El **río de lava** solo se cruza por su puente. En el plateau
+  están el campamento de **Hana** (forja) y **Nuria** (refugiada) y el explorador **Teo**.
+  La lava es incandescente y animada (`src/gfx/Lava.js`) y no se puede pisar.
+- **Llave del Volcán**: en una cámara oculta tras un muro falso del campamento.
+- **Cráter**: la Puerta del Cráter, de obsidiana, se abre con la llave. Al otro lado, el foso de
+  lava y el jefe **Ignar, el Coloso de Magma** (2 fases: golpes, ondas de choque, rocas lanzadas y
+  limos de lava de refuerzo).
+- 4 misiones: Brasas para la forja, Limos de lava, Agua para Teo y Vidrio de volcán.
+
 ### Gráficos
 
 Hay dos estilos visuales con el mismo juego por debajo:
@@ -237,6 +256,7 @@ node tools/build-monsters.mjs .cache/um   # recolorea y optimiza los monstruos (
 node tests/monsters.mjs   # galería de los monstruos animados (test-results/monstruos.png)
 python3 tools/gen_desert.py --check   # comprueba que todo el desierto es alcanzable
 node tests/data.mjs  # validación de los datos de las zonas
+node tests/phase5.mjs  # fase 5 de punta a punta: regreso, despedida y volcán (Playwright)
 node tests/caves-quick.mjs   # traza rápida del puzle de bloques de las cuevas
 node tests/shots.mjs '[{"zone":"caves","c":22,"r":45}]'   # capturas para revisión visual
 python3 tools/genmaps.py caves   # regenera el mapa de las cuevas y verifica los puzles

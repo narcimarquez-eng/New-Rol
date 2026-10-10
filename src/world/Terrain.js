@@ -24,6 +24,7 @@ export class Terrain {
     const amp = zone.data.terrain?.amplitude ?? 0.8;
     const seed = zone.data.terrain?.seed ?? 1;
     const dunes = zone.data.terrain?.dunes || 0; // altura de las dunas (solo sobre arena)
+    const waterDepth = zone.data.terrain?.waterDepth ?? 1.6; // hondura de lagos y ríos (la lava usa una cubeta menos honda)
 
     for (let j = 0; j < this.VH; j++) {
       for (let i = 0; i < this.VW; i++) {
@@ -31,7 +32,7 @@ export class Terrain {
         let h = (fbm(x * 0.05, z * 0.05, seed, 3) - 0.3) * amp;
         // fracción de agua alrededor del vértice -> orillas inclinadas
         const wf = this.waterFraction(i, j);
-        h = h * (1 - wf) - wf * 1.6;
+        h = h * (1 - wf) - wf * waterDepth;
         if (dunes) {
           // crestas asimétricas (suaves a barlovento, empinadas a sotavento) deformadas por ruido
           const sf = this.groundFraction(i, j, 'sand');

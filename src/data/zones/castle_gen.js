@@ -109,7 +109,7 @@ export const entities = [
   {"type": "prop", "kind": "bookshelf", "tile": [15, 3.7], "rot": 0, "box": [3.4, 0.9]},
   {"type": "door", "id": "k_gate", "tile": [27, 17], "span": 2, "style": "stone", "requires": {"all": [{"item": "seal_crystal"}, {"item": "seal_light"}, {"item": "seal_flame"}]}, "lockedText": "La Gran Puerta. Tres huecos brillan en la piedra: uno con forma de cristal, otro de sol y otro de llama."},
   {"type": "door", "id": "k_balcony", "tile": [27, 1], "span": 2, "style": "stone", "requires": {"flag": "boss_castle"}, "auto": true, "lockedText": "Una puerta sellada por la magia de Malakar."},
-  {"type": "portal", "tile": [27, 0], "span": 2, "to": "credits", "flag": "game_complete", "label": "Balcón del reino", "ending": {"title": "¡Has salvado el reino!", "tagline": "Malakar ha caído y la luz vuelve al castillo.", "text": "Desde el balcón, el reino entero celebra tu victoria. Kael, Borg, Sir Aldric y Sir Cedric levantan sus armas en tu honor.<br/><b>¡Gracias por jugar a New Rol!</b>"}},
+  {"type": "portal", "tile": [27, 0], "span": 2, "to": "credits", "flag": "game_complete", "label": "Balcón del reino", "ending": {"title": "¡Has salvado el reino!", "tagline": "Malakar ha caído y la luz vuelve al castillo.", "text": "Desde el balcón, el reino entero celebra tu victoria. Kael, Borg, Sir Aldric y Sir Cedric levantan sus armas en tu honor.<br/><b>Pero en el horizonte se alza una columna de humo: el volcán despierta…</b>"}},
   {"type": "sign", "tile": [10, 41], "text": "ALA DEL CRISTAL\nGolpea los cristales: las barreras rojas y azules se alternan.\nDespués, dos bloques y dos placas."},
   {"type": "barrier", "tile": [4, 38], "color": "red"},
   {"type": "barrier", "tile": [5, 38], "color": "red"},

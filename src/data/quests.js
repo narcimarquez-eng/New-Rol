@@ -201,4 +201,50 @@ export const QUESTS = {
       done: ['Que la luz te acompañe ante el trono.'],
     },
   },
+
+  // ---------------------------------------------------------------- Volcán Ardiente
+  q_ember: {
+    name: 'Brasas para la forja', zone: 'volcano', giver: 'hana', type: 'collect', item: 'ember', count: 4, consume: true,
+    desc: 'Hana necesita 4 brasas de magma para encender su forja. Las dejan caer los limos, murciélagos y espíritus de ascuas.',
+    reward: [['potion', 2], ['coin', 40]],
+    lines: {
+      offer: ['¡Cuidado con el suelo, forastero! Esta ceniza todavía quema.', 'Mi forja se apagó la noche en que empezó a temblar la montaña.', 'Si me traes cuatro brasas de magma, volverá a arder. ¿Me ayudas?'],
+      active: ['Las brasas caen de las criaturas de lava. Brillan como ascuas naranjas: busca por las laderas.'],
+      complete: ['¡Por fin! Mira qué llama tan bonita... Toma, dos pociones. En la forja nadie se va con las manos vacías.'],
+      done: ['La forja vuelve a rugir. ¡Qué calor da!'],
+    },
+  },
+  q_lava: {
+    name: 'Limos de lava', zone: 'volcano', giver: 'hana', type: 'kill', enemy: 'lavaSlime', count: 6,
+    desc: 'Los limos de lava se derraman por el sendero y queman las herramientas de Hana. Derrota a 6.',
+    reward: [['heart_container', 1]],
+    lines: {
+      offer: ['Y otra cosa: los limos de lava se han comido medio camino.', 'Si acabas con seis, te daré algo que guardo para los días malos.'],
+      active: ['Los limos de lava se arrastran por la ladera y la cuenca de entrada. ¡No te acerques demasiado!'],
+      complete: ['¡Seis! Ya puedo trabajar sin quemarme las manos.', 'Este corazón de cristal lo sacó mi abuelo del cráter. Ahora es tuyo.'],
+      done: ['Los limos han vuelto a su charco. Cuida tu espalda, forastero.'],
+    },
+  },
+  q_flask: {
+    name: 'Agua para Teo', zone: 'volcano', giver: 'nuria', type: 'deliver', item: 'water_flask', target: 'teo',
+    desc: 'Lleva un frasco de agua fresca al explorador Teo, que quedó atrapado en el plateau del este.',
+    reward: [['potion', 2], ['coin', 50]],
+    lines: {
+      offer: ['El explorador Teo se fue al este a medir la lava... y no ha vuelto a por agua.', 'Toma este frasco y llévaselo. Está en el plateau del este, al otro lado del puente.'],
+      active: ['Teo está en el plateau del este. Cruza el puente del río y sigue hacia el este.'],
+      target: ['¡Agua! Creía que me moría de sed entre tanta piedra.', 'Gracias. Toma, mira lo que encontré en la ladera.'],
+      done: ['Teo ya no tiene sed, pero sigue sin querer irse de allí.'],
+    },
+  },
+  q_obsidian: {
+    name: 'Vidrio de volcán', zone: 'volcano', giver: 'teo', type: 'collect', item: 'obsidian', count: 3, consume: true,
+    desc: 'Teo quiere 3 trozos de obsidiana, vidrio negro que se forma cuando la lava se enfría de golpe. Hay varios repartidos por la ladera y la cuenca.',
+    reward: [['stamina_up', 1], ['coin', 60]],
+    lines: {
+      offer: ['¡Ah, un visitante! Estoy estudiando el volcán. ¿Me traes algo para mi colección?', 'Busco obsidiana. Tres trozos me bastarían para terminar mi mapa de la lava.'],
+      active: ['Brilla con reflejos morados. Busca en la ladera y en la cuenca de entrada.'],
+      complete: ['¡Obsidiana perfecta! Con esto afilo mi cuchillo y seguiré midiendo la lava.'],
+      done: ['Estoy casi seguro de que el volcán va a despertar del todo. Ten mucho cuidado.'],
+    },
+  },
 };
