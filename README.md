@@ -186,6 +186,14 @@ procedural.
 
 Los personajes son los modelos estilizados KayKit (low-poly con esqueleto y animaciones).
 
+### Perla, la ballena del estanque
+
+En el estanque de la Aldea vive **Perla**, una yubarta mágica que encogió para caber en él
+(adaptación de la escena «Salto de la yubarta», toda hecha por código). Salta sola de vez en
+cuando si andas cerca, o al **silbarle desde la orilla** (botón de interactuar): sale del agua
+girando, cae de espaldas y levanta una lluvia de gotas, bruma con arcoíris y espuma, con su
+sonido. Dos gaviotas planean sobre el estanque. Código en `src/entities/Whale.js`.
+
 ### Monstruos animados
 
 Limos, murciélagos, la seta mordedora, los trasgos y su rey, el espíritu de escarcha y el
