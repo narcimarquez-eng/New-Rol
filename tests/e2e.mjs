@@ -204,6 +204,27 @@ try {
   const camV = await cameraReport();
   ok(camV.bad === 0, `Aldea: cámara correcta en ${camV.n} posiciones (${camV.bad} fallos)`);
 
+  // ---------- la ballena del estanque ----------
+  const whale = await page.evaluate(() => {
+    const g = window.__game, w = g.interactables.find((i) => i.pond);
+    if (!w) return null;
+    window.__t.tp(27, 19.6); // orilla norte del estanque
+    g.step(1 / 60);
+    const prompt = w.prompt;
+    w.interact();
+    let maxSpray = 0, maxY = -99, foam = 0;
+    for (let k = 0; k < 60 * 8; k++) {
+      g.step(1 / 60);
+      maxSpray = Math.max(maxSpray, w.P.count);
+      foam = Math.max(foam, w.foam.uniforms.uFoam.value);
+      if (w.B.active) maxY = Math.max(maxY, w.W.body.getWorldPosition(w._v).y);
+    }
+    return { prompt, breaches: w.breaches, maxSpray, maxY, foam, hidden: !w.W.root.visible, seen: g.progress.flags.has('saw_whale') };
+  });
+  ok(whale && /Silbar/.test(whale.prompt), `en la orilla del estanque aparece "${whale?.prompt}"`);
+  ok(whale && whale.breaches >= 1 && whale.maxY > 1.5 && whale.hidden, `la ballena salta al silbarle (altura ${whale?.maxY?.toFixed(1)}) y vuelve al agua`);
+  ok(whale && whale.maxSpray > 100 && whale.foam > 0.3 && whale.seen, `el salto levanta gotas y bruma (${whale?.maxSpray}) y espuma`);
+
   // ---------- combate real con un limo ----------
   await page.evaluate(() => { window.__game.player.hp = window.__game.player.maxHp; window.__t.tp(17.5, 29); window.__t.sim(0.2); });
   const before = await page.evaluate(() => window.__game.progress.totalKills);

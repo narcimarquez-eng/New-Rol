@@ -15,6 +15,7 @@ import { charactersReady } from '../gfx/Characters.js';
 import { Enemy } from '../entities/Enemy.js';
 import { NPC, Chest, Door, Sign, Pickup, Dummy, Portal, IceBlock, Plate, ResetStone } from '../entities/Interactables.js';
 import { createPuzzleEntity, ShadowPylon } from '../entities/Puzzles.js';
+import { Whale } from '../entities/Whale.js';
 import { Particles } from '../systems/Particles.js';
 import { Projectiles } from '../systems/Projectiles.js';
 import { GLOBAL } from '../gfx/ModelKit.js';
@@ -308,6 +309,7 @@ export class Game {
         case 'chest': this.addInteractable(new Chest(this, e)); break;
         case 'door': this.addInteractable(new Door(this, e)); break;
         case 'sign': this.addInteractable(new Sign(this, e)); break;
+        case 'whale': this.addInteractable(new Whale(this, e)); break;
         case 'portal': this.addInteractable(new Portal(this, e)); break;
         case 'dummy': { const d = new Dummy(this, e); this.dummies.push(d); this.addInteractable(d); break; }
         case 'iceblock': this.addInteractable(new IceBlock(this, e)); break;

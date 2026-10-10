@@ -111,6 +111,14 @@ export class Audio {
       case 'potion': [60, 67, 72, 79].forEach((n, i) => this.tone(NOTE(n), 0.2, { type: 'sine', vol: 0.25, delay: i * 0.07 })); break;
       case 'bush': this.noise(0.25, { vol: 0.25, freq: 3000, q: 0.5, sweep: -2000 }); break;
       case 'enemyAtk': this.tone(300, 0.15, { type: 'sawtooth', vol: 0.1, slide: 200 }); break;
+      // ballena del estanque: silbido, salida del agua, gran chapuzón y su canto
+      case 'whistle': this.tone(NOTE(84), 0.18, { type: 'sine', vol: 0.12, slide: 300 }); this.tone(NOTE(88), 0.3, { type: 'sine', vol: 0.12, delay: 0.2, slide: -200 }); break;
+      case 'splash': this.noise(0.7, { vol: 0.3, freq: 1400, sweep: -900, q: 0.4 }); break;
+      case 'bigsplash':
+        this.noise(1.4, { vol: 0.45, freq: 500, sweep: -350, type: 'lowpass' });
+        this.noise(1.0, { vol: 0.25, freq: 2600, sweep: -2000, q: 0.5, delay: 0.05 });
+        this.tone(110, 1.6, { type: 'sine', vol: 0.12, slide: 120, delay: 0.3 }); this.tone(170, 1.2, { type: 'sine', vol: 0.08, slide: -60, delay: 1.0 });
+        break;
       case 'hop': this.tone(200, 0.1, { type: 'sine', vol: 0.12, slide: 200 }); break;
       case 'death': [67, 63, 60, 55].forEach((n, i) => this.tone(NOTE(n), 0.4, { type: 'triangle', vol: 0.2, delay: i * 0.25 })); break;
       case 'boss': [43, 46, 43, 49].forEach((n, i) => this.tone(NOTE(n), 0.35, { type: 'sawtooth', vol: 0.15, delay: i * 0.3 })); break;

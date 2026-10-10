@@ -154,6 +154,9 @@ export default {
     { type: 'prop', kind: 'anvil', tile: [11, 13.4], radius: 0.6 },
     { type: 'sign', tile: [19, 10.5], text: '↑ Norte: Bosque Encantado\n← Oeste: Zona de entrenamiento\n→ Este: Granja de Tomás' },
     { type: 'sign', tile: [7, 15.5], text: 'ZONA DE ENTRENAMIENTO\nAtaca: clic izq. / F · Combo: pulsa varias veces\nBloquea: clic der. / R · Esquiva: Espacio' },
+    // --- estanque de la ballena (Perla salta sola de vez en cuando; se le puede silbar desde la orilla) ---
+    { type: 'whale', name: 'Perla', tile: [28, 22.5], spots: [[25.5, 22.5], [30.5, 22.5]] },
+    { type: 'sign', tile: [25, 19], text: 'ESTANQUE DE LA BALLENA\nAquí vive Perla, una ballena mágica que encogió para caber en el estanque.\nSilba desde la orilla y saltará para ti.' },
     { type: 'sign', tile: [19, 26], text: 'PRADO SUR\n¡Cuidado con los limos!\nCorta los arbustos: a veces esconden monedas.' },
 
     // --- antorchas (luces dinámicas) ---
