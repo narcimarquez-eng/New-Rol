@@ -351,9 +351,9 @@ export class Whale extends Base {
     const [x, z] = this.spots[B.spot];
     const W = this.W;
     W.root.position.set(x, WATER_Y, z);
-    // de cara a lo largo del estanque (el lado largo de cada mitad), algo ladeada
+    // de lado respecto a las orillas largas (norte y sur), así se ve de perfil, algo ladeada
     const sgn = Math.random() < 0.5 ? 1 : -1;
-    W.root.rotation.y = (Math.random() < 0.5 ? 0 : Math.PI) + sgn * (0.2 + Math.random() * 0.25);
+    W.root.rotation.y = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2 + sgn * (0.15 + Math.random() * 0.25);
     // retrocede para que el salto quede centrado en el punto elegido
     const back = 2.6 * SCALE;
     W.root.position.x -= Math.sin(W.root.rotation.y) * back;
