@@ -225,23 +225,6 @@ function crown(r) {
   return g;
 }
 
-/** Cuerno curvo (murciélagos). */
-function horn(len, rad, mat) {
-  const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, len * 0.7, -len * 0.1), new THREE.Vector3(0, len, -len * 0.5));
-  const g = new THREE.TubeGeometry(curve, 8, rad, 6);
-  const p = g.attributes.position;
-  // se afila hacia la punta
-  const v = new THREE.Vector3(), c = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) {
-    const t = Math.floor(i / 7) / 8;
-    curve.getPoint(t, c);
-    v.fromBufferAttribute(p, i).sub(c).multiplyScalar(1 - t * 0.85).add(c);
-    p.setXYZ(i, v.x, v.y, v.z);
-  }
-  g.computeVertexNormals();
-  return new THREE.Mesh(g, mat);
-}
-
 // ---------------------------------------------------------------- modificaciones
 
 const MODS = {
@@ -263,8 +246,8 @@ const MODS = {
     }
   },
 
-  bat(scene, box) { batMods(scene, box, 0xffc030, 0x2a1a10); },
-  frostbat(scene, box) { batMods(scene, box, 0x7fe8ff, 0xdff6ff, true); },
+  bat(scene, box) { batMods(scene, box, 0xffc030); },
+  frostbat(scene, box) { batMods(scene, box, 0x7fe8ff, true); },
 
   plant(scene, box) {
     // seta venenosa: sombrero rojo con motas blancas y ojos verdes
@@ -354,18 +337,16 @@ const MODS = {
   },
 };
 
-/** Murciélagos: cuernos curvos sobre la cabeza y ojos que brillan. */
-function batMods(scene, box, eyeHex, hornHex, icy = false) {
+/** Murciélagos: ojos que brillan; el de escarcha lleva además una cresta de hielo en el lomo. */
+function batMods(scene, box, eyeHex, icy = false) {
   const eye = materialsOf(scene).get('Eye_Black');
   if (eye) { eye.color.set(eyeHex).multiplyScalar(0.3); glow(eye, eyeHex, 1.5); }
+  if (!icy) return;
   const size = box.max.y - box.min.y;
-  const mat = icy ? iceMat(0xdff6ff, 0x5fc8ff, 0.4) : new THREE.MeshStandardMaterial({ color: hornHex, roughness: 0.45, name: 'Horn' });
-  const head = scene.getObjectByName('Head').getWorldPosition(new THREE.Vector3());
-  for (const sx of [-1, 1]) {
-    const h = hit(scene, new THREE.Vector3(head.x + sx * size * 0.12, box.max.y + 1, head.z), new THREE.Vector3(0, -1, 0));
-    if (!h) continue;
-    const hm = horn(size * 0.22, size * 0.035, mat);
-    hm.rotation.z = -sx * 0.35;
-    stud(scene, h, hm, { tilt: 0.4, sink: size * 0.02, bone: 'Head' });
+  const mat = iceMat(0xdff6ff, 0x5fc8ff, 0.4);
+  const torso = scene.getObjectByName('Torso').getWorldPosition(new THREE.Vector3());
+  for (const [x, dz] of [[0, -0.12], [-0.07, -0.2], [0.07, -0.2], [0, -0.28]]) {
+    const h = hit(scene, new THREE.Vector3(torso.x + x * size, box.max.y + 1, torso.z + dz * size), new THREE.Vector3(0, -1, 0));
+    if (h) stud(scene, h, crystalCluster(size * 0.13, mat, 2), { tilt: 0.6, sink: size * 0.01 });
   }
 }

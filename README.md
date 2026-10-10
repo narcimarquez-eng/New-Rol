@@ -196,8 +196,8 @@ retocados para que sean propios del juego:
 |---|---|---|
 | Limo | Blob verde | gelatina brillante y translúcida |
 | Limo de hielo | Blob rosa | azul hielo translúcido con una corona de cristales de escarcha |
-| Murciélago | Demonio volador | morado, cuernos curvos y ojos que brillan |
-| Murciélago de escarcha | Demonio volador | azul y blanco, cuernos de hielo, ojos cian |
+| Murciélago | Demonio volador | morado oscuro con ojos amarillos que brillan |
+| Murciélago de escarcha | Demonio volador | azul y blanco, cresta de cristales de hielo en el lomo, ojos cian |
 | Planta mordedora | Mushnub | seta venenosa: sombrero rojo con motas blancas, ojos verdes |
 | Trasgo | Orco | verde con cabezota, ropa de cuero y ojos ámbar |
 | Rey Trasgo | Orco | gigante, más ancho, ropa morada y dorada, corona de oro con gemas |
@@ -205,7 +205,7 @@ retocados para que sean propios del juego:
 | Golem de Hielo | Yeti | enorme, con crestas de cristal de hielo en la espalda, hombros y cabeza |
 
 Los colores se cambian al generar los archivos (`tools/build-monsters.mjs`); los accesorios
-(corona, cristales, cuernos, motas) se pegan a los huesos al cargar (`src/gfx/Monsters.js`),
+(corona, cristales, motas) se pegan a los huesos al cargar (`src/gfx/Monsters.js`),
 disparando rayos contra la malla para que queden sobre la superficie y sigan la animación.
 Cada monstruo usa sus propias animaciones (reposo, andar o volar, morder, cabezazo,
 puñetazo, golpe con el arma, recibir daño y morir) con el mismo sistema que los

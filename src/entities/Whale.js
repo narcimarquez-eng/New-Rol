@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { Base } from './Interactables.js';
 
 const WATER_Y = -0.55;
-const SCALE = 0.55; // la yubarta original mide 14 m; Perla, unos 7,7
+const SCALE = 0.66; // la yubarta original mide 14 m; Perla, unos 9
 const L = 14, R = L * 0.125;
 
 function rad(s) {
@@ -237,7 +237,7 @@ function updateSpray(P, dt) {
       P.vel[j + 2] *= dragMist;
       P.pos[j] += P.vel[j] * dt; P.pos[j + 1] += P.vel[j + 1] * dt; P.pos[j + 2] += P.vel[j + 2] * dt;
       P.size[i] = P.size0[i] * (1 + 1.3 * t);
-      P.alpha[i] = 0.26 * Math.sin(Math.PI * Math.min(1, t * 1.15));
+      P.alpha[i] = 0.2 * Math.sin(Math.PI * Math.min(1, t * 1.15));
     }
   }
   P.aPos.needsUpdate = P.aSize.needsUpdate = P.aAlpha.needsUpdate = P.aSoft.needsUpdate = true;
@@ -449,9 +449,9 @@ export class Whale extends Base {
           const big = Math.random() < 0.12;
           emit(P, 0, v.x + cx * rr, WATER_Y + 0.1, v.z + cz * rr, cx * out + vx * 0.15, up, cz * out + vz * 0.15,
             big ? 0.3 + Math.random() * 0.2 : 0.07 + Math.random() * 0.14, 2.2 + Math.random());
-          if (Math.random() < 0.25) {
+          if (Math.random() < 0.14) {
             emit(P, 1, v.x + cx * rr, WATER_Y + Math.random() * 1.5, v.z + cz * rr, cx * (0.6 + Math.random() * 1.5), 0.5 + Math.random() * 1.6, cz * (0.6 + Math.random() * 1.5),
-              1.8 + Math.random() * 3.5, 3 + Math.random() * 3);
+              0.9 + Math.random() * 1.8, 2.2 + Math.random() * 2.2);
           }
         }
         this.foamTarget.set(v.x, v.z);
