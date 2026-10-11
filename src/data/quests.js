@@ -258,7 +258,7 @@ export const QUESTS = {
       done: ['Ya duermo tranquilo. Dicen que los volcanes no duermen nunca... pero yo sí.'],
     },
   },
-  q_shards: {
+  q_sombras: {
     name: 'Fragmentos de sombra', zone: 'volcano', giver: 'ardea', type: 'collect', item: 'shadow_shard', count: 3, consume: true,
     requires: { flag: 'ardea_lore' },
     desc: 'Ardea necesita 3 fragmentos de la sombra de Malakar. Flotan como ceniza negra por el plateau, la ladera y la cuenca.',

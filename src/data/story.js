@@ -45,7 +45,7 @@ export const STORY = [
   { until: { flag: 'opened_v_bridge' }, text: 'Acto II · Sube al río de lava y enciende a la vez los tres braseros de la orilla para levantar la reja del puente.' },
   { until: { flag: 'spoke_hana' }, text: 'Cruza el puente y habla con Hana, en la forja del plateau.' },
   { until: { flag: 'spoke_ardea' }, text: 'Acto III · Busca a Ardea, el espíritu de la forja antigua, al noreste del plateau.' },
-  { until: { any: [{ quest: { id: 'q_shards', state: 'active' } }, { quest: { id: 'q_shards', state: 'ready' } }, { quest: { id: 'q_shards', state: 'done' } }] }, text: 'Vuelve a hablar con Ardea y acepta su encargo.' },
+  { until: { any: [{ quest: { id: 'q_sombras', state: 'active' } }, { quest: { id: 'q_sombras', state: 'ready' } }, { quest: { id: 'q_sombras', state: 'done' } }] }, text: 'Vuelve a hablar con Ardea y acepta su encargo.' },
   { until: { any: [{ has: 'key_volcano' }, { flag: 'opened_v_crater' }] }, text: 'Encuentra la Llave del Volcán: está tras un muro falso, en la cámara del oeste del plateau.' },
   { until: { flag: 'opened_v_crater' }, text: 'Lleva la Llave del Volcán a la Puerta del Cráter, al norte del plateau.' },
   { until: { flag: 'boss_volcano' }, text: 'Acto IV · Derrota a Ignar, el Coloso de Magma, en el corazón del cráter.' },

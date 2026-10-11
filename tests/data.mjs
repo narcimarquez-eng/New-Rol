@@ -6,6 +6,7 @@ import { QUESTS } from '../src/data/quests.js';
 import { ITEMS } from '../src/data/items.js';
 import { ENEMIES } from '../src/data/enemies.js';
 import { TILES } from '../src/world/tiles.js';
+import { readFileSync } from 'node:fs';
 
 let fails = 0;
 const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++; };
@@ -64,6 +65,13 @@ for (const id of ['volcano']) {
     const cands = [[Math.floor(e.tile[0]), Math.floor(e.tile[1])], [Math.floor(e.tile[0] + 0.5), Math.floor(e.tile[1] + 0.5)]];
     ok(cands.some(([c, r]) => seen.has(key(c, r))), `${z.id}: ${e.type} ${e.id || e.kind || e.to || ''} alcanzable desde la aparición`);
   }
+}
+// claves repetidas: en un objeto literal gana la última y la anterior desaparece sin aviso
+// (así una misión nueva pisó en silencio a «Fragmentos de sol»)
+for (const file of ['src/data/quests.js', 'src/data/items.js', 'src/data/enemies.js']) {
+  const keys = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').match(/^  [A-Za-z_0-9]+: \{/gm) || [];
+  const dup = [...new Set(keys.filter((k, i) => keys.indexOf(k) !== i))];
+  ok(dup.length === 0, `${file}: sin claves repetidas${dup.length ? ` (${dup.join(' ')})` : ''}`);
 }
 // fase 5: el cráter termina en dos salidas distintas, según la elección con la Brasa Negra
 {

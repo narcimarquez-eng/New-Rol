@@ -151,11 +151,11 @@ ok((await quest('q_ember')) === 'active' && (await page.evaluate(() => window.__
 await talk('ardea');
 ok(await page.evaluate(() => window.__game.progress.flags.has('ardea_lore')), 'Ardea cuenta la historia de la forja y los sellos');
 await talk('ardea', 0);
-ok((await quest('q_shards')) === 'active', 'Ardea encarga recoger tres fragmentos de sombra');
+ok((await quest('q_sombras')) === 'active', 'Ardea encarga recoger tres fragmentos de sombra');
 await page.evaluate(() => window.__game.progress.add('shadow_shard', 3));
-ok((await quest('q_shards')) === 'ready', 'con los tres fragmentos, la misión de Ardea está lista');
+ok((await quest('q_sombras')) === 'ready', 'con los tres fragmentos, la misión de Ardea está lista');
 await talk('ardea');
-ok((await quest('q_shards')) === 'done', 'Ardea recibe los fragmentos y la misión queda terminada');
+ok((await quest('q_sombras')) === 'done', 'Ardea recibe los fragmentos y la misión queda terminada');
 
 // 8) el cráter: al vencer a Ignar aparece el espíritu de Ardea, y su elección abre una salida
 await page.evaluate(() => { window.__game.progress.flags.add('opened_v_crater'); window.__game.progress.flags.add('boss_volcano'); });

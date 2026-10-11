@@ -73,7 +73,7 @@ const npcs = [
       'Desde que cayó Malakar, la montaña respira fuego. Dicen que su última sombra se hundió en el cráter.',
       'Desde aquí se ve el cráter. Ahí dentro hay algo que late como un corazón, y cada latido levanta humo.',
     ] }] },
-  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_shards'],
+  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_sombras'],
     talk: [
       { when: { notFlag: 'ardea_lore' }, lines: [
         'Este era el taller de los sellos. Hace siglos, mis hermanos forjaron con brasa de este volcán los tres sellos de la Gran Puerta.',
