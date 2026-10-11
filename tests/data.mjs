@@ -82,7 +82,9 @@ for (const file of ['src/data/quests.js', 'src/data/items.js', 'src/data/enemies
   ok(['v_destroy', 'v_seal'].every((f) => exits.some((e) => needs(e, f))), 'volcano: una salida por cada elección (destruir o sellar)');
   ok(exits.every((e) => needs(e, 'dragon_defeated')), 'volcano: las dos salidas esperan a que caiga el dragón de brasa');
   const dragon = z.entities.find((e) => e.type === 'enemy' && e.kind === 'dragon');
-  ok(!!dragon && dragon.when?.flag === 'v_choice_done' && !!dragon.emerge, 'volcano: el dragón de brasa aparece tras la elección y sale de la roca');
+  const dragonWhen = dragon?.when?.all || [];
+  ok(!!dragon && !!dragon.emerge && dragonWhen.some((c) => c.flag === 'v_choice_done') && dragonWhen.some((c) => c.quest?.id === 'q_hielo'),
+    'volcano: el dragón de brasa aparece tras la elección y la misión de cristales, y sale de la roca');
   ok(z.entities.filter((e) => e.type === 'pickup' && e.item === 'frost_crystal').length >= 6, 'volcano: hay al menos seis cristales de hielo para la misión');
   const choice = z.entities.find((e) => e.id === 'ardea_spirit')?.talk?.find((r) => r.choices);
   ok(!!choice && ['v_destroy', 'v_seal'].every((f) => choice.choices.some((c) => c.do.some((a) => a.flag === f))), 'volcano: el espíritu de Ardea ofrece destruir o sellar');

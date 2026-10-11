@@ -195,8 +195,8 @@ un solo botón; la preferencia se guarda en el navegador.
 - **Lava** incandescente y animada (`src/gfx/Lava.js`); no se puede pisar.
 - **Misiones** (7): Brasas para la forja y Limos de lava (Hana), Agua para Teo (de Nuria a Teo),
   Vidrio de volcán (Teo), El muñeco de Pipo (Pipo), Fragmentos de sombra (Ardea) y **Cristales de
-  hielo** (Ardea): seis cristales entre las piedras negras de la cuenca, que no se gastan al entregarlos
-  y son los que necesitas contra el dragón.
+  hielo** (Brasio, el minero de la cuenca): seis cristales entre las piedras negras de la cuenca, que no
+  se gastan al entregarlos y son los que necesitas contra el dragón. El dragón no nace hasta entregarlos.
 - Las reglas de diálogo (`talk`) admiten `choices`: cada opción ejecuta sus acciones (`do`).
   Así se elige entre destruir y sellar la brasa.
 

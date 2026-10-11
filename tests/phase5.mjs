@@ -163,8 +163,12 @@ await page.waitForFunction(() => window.__game.interactables.some((i) => i.id ==
 ok(true, 'tras el jefe aparece el espíritu de Ardea (sin recargar la zona)');
 const exitsBefore = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').length);
 ok(exitsBefore === 0, 'todavía no hay salidas: la decisión abre una');
-// los seis cristales de hielo de la misión de Ardea (el dragón los necesita para congelarse)
+// la misión de los cristales de hielo (Brasio, en la cuenca): el dragón nace cuando se entregan
+await talk('brasio', 0);
+ok((await quest('q_hielo')) === 'active', 'Brasio encarga los cristales de hielo');
 await page.evaluate(() => window.__game.progress.add('frost_crystal', 6));
+await talk('brasio');
+ok((await quest('q_hielo')) === 'done', 'Brasio recibe los seis cristales y la misión queda terminada');
 await talk('ardea_spirit', 0);
 // tras la elección nace el dragón de brasa; la salida elegida espera a que caiga
 await page.waitForFunction(() => window.__game.enemies.some((e) => e.kind === 'dragon'), null, { timeout: 20000 });

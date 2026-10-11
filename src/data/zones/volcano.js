@@ -51,10 +51,14 @@ const LOOKS = {
   teo: { tunic: 0x3a7a5a, hair: 0x6b4a2a, hat: 0x8a6a3a, hatStyle: 'straw', pants: 0x4a4030, beard: 0x6b4a2a, face: 'npc', eyes: '#3a2a1a' },
   pipo: { tunic: 0xd8553a, hair: 0x3a2a1a, pants: 0x3a3a5a, face: 'npc', eyes: '#2a1a0a', scale: 0.72 },
   ardea: { tunic: 0xe0a070, hair: 0xf2e6d8, hatStyle: 'hood', pants: 0x5a4030, face: 'girl', eyes: '#ffb347' },
+  brasio: { tunic: 0x6b5a3a, hair: 0x2a1a10, hatStyle: 'helmet', pants: 0x3a3028, beard: 0x2a1a10, face: 'npc', eyes: '#2a1a0a' },
   ardeaSpirit: { tunic: 0xffb070, hair: 0xfff0e0, hatStyle: 'hood', pants: 0xa0603a, face: 'girl', eyes: '#ffd27a' },
 };
 
 const npcs = [
+  // Brasio recoge cristales de hielo entre las piedras negras: encarga la misión de los cristales
+  { type: 'npc', id: 'brasio', name: 'Brasio, el minero', tile: [12, 44], look: LOOKS.brasio, facing: Math.PI, quests: ['q_hielo'],
+    talk: [{ lines: ['Tengo las manos rotas de tanto picar piedra negra. Y el hielo... el hielo está escondido entre ella.'] }] },
   { type: 'npc', id: 'nuria', name: 'Nuria', tile: [9, 50], look: LOOKS.nuria, facing: -Math.PI / 2, quests: ['q_flask'],
     talk: [{ lines: [
       'Aquí dentro estamos a salvo... de momento.',
@@ -73,7 +77,7 @@ const npcs = [
       'Desde que cayó Malakar, la montaña respira fuego. Dicen que su última sombra se hundió en el cráter.',
       'Desde aquí se ve el cráter. Ahí dentro hay algo que late como un corazón, y cada latido levanta humo.',
     ] }] },
-  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_sombras', 'q_hielo'],
+  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_sombras'],
     talk: [
       { when: { notFlag: 'ardea_lore' }, lines: [
         'Este era el taller de los sellos. Hace siglos, mis hermanos forjaron con brasa de este volcán los tres sellos de la Gran Puerta.',
@@ -161,7 +165,8 @@ const entities = [
   // --- jefe final de la fase 5 ---
   { type: 'enemy', kind: 'ignar', id: 'boss_volcano', tile: [19, 7], flag: 'boss_volcano', arena: [11, 4, 32, 10] },
   // dragón de brasa: sale del volcán después de la elección (rompe la roca); hay que vencerlo para salir
-  { type: 'enemy', kind: 'dragon', id: 'dragon_brasa', tile: [19, 7], flag: 'dragon_defeated', when: { flag: 'v_choice_done', notFlag: 'dragon_defeated' }, arena: [11, 4, 32, 10], emerge: true },
+  { type: 'enemy', kind: 'dragon', id: 'dragon_brasa', tile: [19, 7], flag: 'dragon_defeated', arena: [11, 4, 32, 10], emerge: true,
+    when: { all: [{ flag: 'v_choice_done' }, { quest: { id: 'q_hielo', state: 'done' } }, { notFlag: 'dragon_defeated' }] } },
 
   // --- enemigos: ladera, cuenca y plateau ---
   { type: 'enemy', kind: 'lavaSlime', tile: [5, 28] },

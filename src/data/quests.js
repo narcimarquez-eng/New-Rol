@@ -271,9 +271,9 @@ export const QUESTS = {
     },
   },
   q_hielo: {
-    name: 'Cristales de hielo', zone: 'volcano', giver: 'ardea', type: 'collect', item: 'frost_crystal', count: 6, consume: false,
-    requires: { flag: 'ardea_lore' },
-    desc: 'Ardea necesita 6 cristales de hielo para el dragón de brasa. Hay cristales escondidos entre las piedras negras de la cuenca. Esta vez no se gastan: los necesitarás en el cráter.',
+    name: 'Cristales de hielo', zone: 'volcano', giver: 'brasio', type: 'collect', item: 'frost_crystal', count: 6, consume: false,
+    requires: { flag: 'entered_volcano' },
+    desc: 'Brasio, el minero de la cuenca, necesita 6 cristales de hielo contra el dragón de brasa. Hay cristales entre las piedras negras de la cuenca. Esta vez no se gastan: los necesitarás en el cráter.',
     reward: [['heart_container', 1], ['potion', 2]],
     lines: {
       offer: ['El dragón de brasa no se hiere con acero. Solo el hielo lo detiene.', 'Hay cristales de hielo entre las piedras negras de la cuenca. Tráeme seis.'],
