@@ -163,6 +163,8 @@ await page.waitForFunction(() => window.__game.interactables.some((i) => i.id ==
 ok(true, 'tras el jefe aparece el espíritu de Ardea (sin recargar la zona)');
 const exitsBefore = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').length);
 ok(exitsBefore === 0, 'todavía no hay salidas: la decisión abre una');
+// los seis cristales de hielo de la misión de Ardea (el dragón los necesita para congelarse)
+await page.evaluate(() => window.__game.progress.add('frost_crystal', 6));
 await talk('ardea_spirit', 0);
 // tras la elección nace el dragón de brasa; la salida elegida espera a que caiga
 await page.waitForFunction(() => window.__game.enemies.some((e) => e.kind === 'dragon'), null, { timeout: 20000 });
