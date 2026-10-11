@@ -32,6 +32,8 @@ import { STORY } from '../data/story.js';
 import { TILE } from '../world/tiles.js';
 
 const MAX_LIGHTS = 6;
+// Lo que el héroe suele llevar al terminar la fase 4 (atajo «Ir al Volcán»): mejoras y objetos.
+const VOLCANO_KIT = [['heart_container', 8], ['stamina_up', 3], ['sword_up', 1], ['sword_steel', 1], ['potion', 3], ['coin', 150]];
 
 export class Game {
   constructor(container) {
@@ -92,6 +94,11 @@ export class Game {
       if (saved && !confirm('¿Empezar una partida nueva? Se perderá la partida guardada.')) return;
       Save.clear();
       this.start(null);
+    });
+    document.getElementById('btn-volcano').addEventListener('click', () => {
+      if (saved && !confirm('¿Empezar en la fase 5? Se perderá la partida guardada.')) return;
+      Save.clear();
+      this.startVolcanoShortcut();
     });
     document.getElementById('btn-retry').addEventListener('click', () => this.respawn());
     document.getElementById('btn-keep').addEventListener('click', () => { this.ui.show('ending', false); this.setMode('play'); });
@@ -233,6 +240,43 @@ export class Game {
     this.loadZone(zone, spawn);
     this.setMode('play');
     if (!saved) setTimeout(() => this.ui.toast('Habla con el Anciano Bruno (E). Su casa es la del tejado azul.'), 3200);
+  }
+
+  /**
+   * Atajo del menú «Ir al Volcán»: empieza justo después de vencer a Malakar, con las
+   * fases 1 a 4 completadas (banderas de la historia, misiones terminadas, compañeros y el
+   * equipo de VOLCANO_KIT). El final del balcón sigue siendo el que ya conoces.
+   */
+  startVolcanoShortcut() {
+    this.audio.unlock();
+    this.cam.wantDistance = this.cam.distance = 9;
+    this.progress.reset();
+    for (const f of this.storyFlagsBeforeVolcano()) this.progress.flags.add(f);
+    for (const id of Object.keys(COMPANIONS)) this.progress.flags.add(`companion_${id}`);
+    for (const id of Object.keys(QUESTS)) if (QUESTS[id].zone !== 'volcano') this.progress.finishQuest(id);
+    const p = this.player;
+    p.maxHp = 6; p.hp = 6; p.maxStamina = 100; p.stamina = 100; p.swordDamage = 1;
+    for (const [id, qty] of VOLCANO_KIT) this.giveItem(id, qty, { silent: true });
+    p.stamina = p.maxStamina;
+    this.ui.show('title', false);
+    this.ui.show('hud', true);
+    this.touch.setVisible(this.input.isTouch);
+    this.loadZone('castle', 'afterMalakar');
+    this.setMode('play');
+    setTimeout(() => this.ui.toast('Atajo: fases 1 a 4 completadas. Sube al balcón del trono.'), 3200);
+  }
+
+  /** Banderas que marca la historia antes de la fase 5 (salvo la del final: el héroe aún no la ha visto). */
+  storyFlagsBeforeVolcano() {
+    const out = new Set();
+    const walk = (c) => {
+      if (!c) return;
+      for (const k of ['flag', 'notFlag']) if (typeof c[k] === 'string') out.add(c[k]);
+      for (const k of ['any', 'all']) (c[k] || []).forEach(walk);
+    };
+    for (const s of STORY) { if (s.until?.flag === 'phase5_start') break; walk(s.until); }
+    out.delete('game_complete');
+    return out;
   }
 
   toTitle() {
@@ -454,6 +498,18 @@ export class Game {
 
   spawnPickup(item, x, z) {
     return this.addInteractable(new Pickup(this, { item }, x, z));
+  }
+
+  /**
+   * Añade los portales y PNJ cuya condición (when) acaba de cumplirse, sin recargar la zona
+   * (p. ej. el portal de regreso tras el final del castillo o la salida del cráter tras Ignar).
+   */
+  refreshWhenEntities() {
+    for (const e of this.zone.data.entities) {
+      if (!e.when || (e.type !== 'portal' && e.type !== 'npc') || !this.progress.check(e.when)) continue;
+      if (this.interactables.some((i) => i.data === e || (e.type === 'npc' && i.id === e.id))) continue;
+      this.addInteractable(e.type === 'portal' ? new Portal(this, e) : new NPC(this, e));
+    }
   }
 
   usePortal(data) {
@@ -771,6 +827,7 @@ export class Game {
         return true;
       });
       if (playing) this.updateInteraction(inp);
+      if (playing) this.refreshWhenEntities();
       this.updateExploration();
       this.updateAmbient(dt);
       this.saveTimer += dt;

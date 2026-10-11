@@ -1,10 +1,11 @@
-// Prueba de la fase 5 sobre el juego real: el regreso desde el castillo, la
-// despedida de los compañeros en la aldea, el sendero del volcán y el jefe.
+// Prueba de la fase 5 sobre el juego real: el atajo «Ir al Volcán» del menú, el final del
+// balcón y el portal de regreso (sin recargar la zona), la despedida de los compañeros en
+// la aldea, el sendero del volcán, la salida del cráter tras el jefe y la vuelta a la aldea.
 // Uso: node tests/phase5.mjs   (SKIP_BUILD=1 para usar la última compilación;
 // OUTDIR=carpeta para compilar y servir otra copia distinta de dist/)
 import { chromium } from 'playwright-core';
 import { spawn, execSync } from 'node:child_process';
-import { STORY } from '../src/data/story.js';
+import { QUESTS } from '../src/data/quests.js';
 const OUTDIR = process.env.OUTDIR || 'dist';
 if (!process.env.SKIP_BUILD) execSync(`npx vite build --outDir ${OUTDIR} --emptyOutDir`, { stdio: 'ignore' });
 const server = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--outDir', OUTDIR, '--port', '4178', '--strictPort'], { stdio: 'pipe' });
@@ -14,45 +15,53 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto('http://localhost:4178/?fixeddt&low&toon');
+await page.goto('http://localhost:4178/?fixeddt&toon');
 await page.waitForFunction(() => window.__game && window.__game.firstFrameAt, null, { timeout: 60000 });
-await page.click('#btn-new');
-await page.waitForFunction(() => window.__game.mode === 'play', null, { timeout: 20000 });
 
 let fails = 0;
 const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++; };
 
-// banderas de las fases 1-4 (las que marca la historia antes de la fase 5)
-const earlier = [];
-const collect = (cond) => { if (!cond) return; for (const k of ['flag', 'notFlag', 'has']) if (typeof cond[k] === 'string') earlier.push(cond[k]); for (const k of ['any', 'all']) (cond[k] || []).forEach(collect); };
-for (const s of STORY) { if (s.until?.flag === 'phase5_start') break; collect(s.until); }
+// 1) atajo del menú: el héroe empieza en la sala del trono, con Malakar vencido y el final pendiente
+await page.click('#btn-volcano');
+await page.waitForFunction(() => window.__game.zone && window.__game.zone.id === 'castle' && window.__game.mode === 'play', null, { timeout: 30000 });
+const start = await page.evaluate(() => {
+  const g = window.__game, f = g.progress.flags;
+  return {
+    boss: f.has('boss_castle'), finished: f.has('game_complete'), party: g.companions.length,
+    hp: g.player.maxHp, sword: g.player.swordDamage, coins: g.progress.coins,
+    quests: Object.values(g.progress.quests).filter((q) => q.state === 'done').length,
+    returnPortal: g.interactables.some((i) => i.data && i.data.to === 'village'),
+    objective: g.currentObjective(),
+  };
+});
+const phase14 = Object.keys(QUESTS).filter((id) => QUESTS[id].zone !== 'volcano').length;
+ok(start.boss && !start.finished, 'el atajo empieza con Malakar vencido y el final del balcón pendiente');
+ok(start.party === 4, `los cuatro compañeros acompañan al héroe (${start.party})`);
+ok(start.hp === 22 && start.sword === 3 && start.coins === 150, `el héroe lleva el equipo de final de fase 4 (vida ${start.hp}, daño ${start.sword}, monedas ${start.coins})`);
+ok(start.quests === phase14, `las misiones de las fases 1 a 4 están terminadas (${start.quests}/${phase14})`);
+ok(!start.returnPortal, 'el portal de regreso aún no aparece: lo abre el final del balcón');
+ok(/balcón/i.test(start.objective), `el objetivo es subir al balcón (${start.objective})`);
 
-// 1) partida con el castillo ya vencido y los cuatro compañeros en el grupo
-await page.evaluate((flags) => {
-  const g = window.__game;
-  for (const f of flags) g.progress.flags.add(f);
-  for (const id of ['kael', 'aldric', 'cedric', 'borg']) g.progress.flags.add(`companion_${id}`);
-  g.progress.flags.add('game_complete');
-  g.loadZone('castle', 'fromDesert');
-}, [...new Set(earlier.filter((f) => !f.startsWith('companion_')))]);
+// 2) el balcón completa el final y el portal de regreso aparece sin recargar la zona
+await page.evaluate(() => { const g = window.__game; const b = g.interactables.find((i) => i.data && i.data.to === 'credits'); g.player.place(b.x, b.z + 0.5, 0); });
+await page.waitForFunction(() => window.__game.progress.flags.has('game_complete'), null, { timeout: 60000 });
+ok(await page.evaluate(() => !document.getElementById('ending').classList.contains('hidden')), 'el balcón muestra la pantalla final');
+await page.click('#btn-keep');
+await page.waitForFunction(() => window.__game.interactables.some((i) => i.data && i.data.to === 'village'), null, { timeout: 20000 });
+ok(true, 'tras el final aparece el portal de regreso a la aldea (sin recargar la zona)');
 const portal = await page.evaluate(() => {
   const g = window.__game;
   const p = g.interactables.find((i) => i.data && i.data.to === 'village');
   if (p) g.player.place(p.x, p.z + 0.5, Math.PI);
-  return { exists: !!p, companions: g.companions.length };
+  return !!p;
 });
-ok(portal.exists, 'el portal de regreso aparece en la sala del trono tras el final');
-ok(portal.companions === 4, `los cuatro compañeros acompañan al héroe (${portal.companions})`);
+ok(portal, 'el portal de regreso se puede cruzar');
 
-// 2) cruzar el portal: vuelve a la aldea y los compañeros se despiden uno a uno
+// 3) cruzar el portal: vuelve a la aldea y los compañeros se despiden uno a uno
 await page.waitForFunction(() => window.__game.zone.id === 'village' && window.__game.ui.dialog, null, { timeout: 30000 });
 const farewellNames = [];
 for (let n = 0; n < 200; n++) {
-  const done = await page.evaluate(() => {
-    const g = window.__game;
-    if (!g.ui.dialog) return true;
-    return false;
-  });
+  const done = await page.evaluate(() => !window.__game.ui.dialog);
   if (done) break;
   const name = await page.evaluate(() => window.__game.ui.dialog && window.__game.ui.dialog.name);
   if (name && farewellNames[farewellNames.length - 1] !== name) farewellNames.push(name);
@@ -77,7 +86,7 @@ ok(after.npcs.every(Boolean), 'los compañeros se quedan en la aldea como habita
 ok(after.mode === 'play', 'el juego vuelve al modo de juego tras la despedida');
 ok(/volcán|sendero/i.test(after.objective), `el objetivo principal apunta al volcán (${after.objective})`);
 
-// 3) el sendero del volcán está abierto y lleva al volcán
+// 4) el sendero del volcán está abierto y lleva al volcán
 const vol = await page.evaluate(() => {
   const g = window.__game;
   const p = g.interactables.find((i) => i.data && i.data.to === 'volcano');
@@ -100,7 +109,12 @@ ok(inVolcano.boss, 'el jefe Ignar está en el cráter');
 ok(inVolcano.door, 'la Puerta del Cráter está en el mapa');
 ok(/río de lava|llave/i.test(inVolcano.objective), `el objetivo es cruzar el río y buscar la llave (${inVolcano.objective})`);
 
-// 4) volver a la aldea desde el volcán: la despedida ya no se repite y los amigos siguen en la plaza
+// 5) al vencer a Ignar, la salida del cráter aparece sin recargar la zona
+await page.evaluate(() => { window.__game.progress.flags.add('boss_volcano'); });
+await page.waitForFunction(() => window.__game.interactables.some((i) => i.data && i.data.to === 'credits'), null, { timeout: 20000 });
+ok(true, 'tras el jefe aparece la salida del cráter (sin recargar la zona)');
+
+// 6) volver a la aldea desde el volcán: la despedida ya no se repite y los amigos siguen en la plaza
 const back = await page.evaluate(() => {
   const g = window.__game;
   const p = g.interactables.find((i) => i.data && i.data.to === 'village');

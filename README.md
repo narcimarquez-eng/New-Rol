@@ -152,6 +152,11 @@ primera visita guarda el juego). Al publicar una versión nueva, se actualiza so
 
 ### Contenido de la Fase 5
 
+- **Atajo «Ir al Volcán (fase 5)»** en el menú principal: empieza justo después de vencer a
+  Malakar, con las fases 1 a 4 completadas (misiones terminadas, compañeros y un equipo parecido
+  al de ese momento). Desde el balcón del trono se completa el final y todo sigue igual que en
+  una partida normal.
+
 - **Regreso a la aldea**: tras vencer a Malakar, un portal de la sala del trono lleva de vuelta
   a la **Aldea Inicial**. Al llegar, **Kael**, **Sir Aldric**, **Sir Cedric** y **Borg** se
   despiden del héroe uno a uno, y se quedan en el pueblo como habitantes (cada uno en el sitio

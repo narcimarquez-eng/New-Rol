@@ -54,6 +54,8 @@ const npcs = [
 // de vuelta a la Aldea Inicial: el inicio de la fase 5 (el volcán).
 const returnPortal = { type: 'portal', tile: [27, 11], span: 2, to: 'village', spawn: 'fromCastle', flag: 'phase5_start',
   when: { flag: 'game_complete' }, label: 'Aldea Inicial' };
+// punto de aparición del atajo «Ir al Volcán»: en la sala del trono, de cara al balcón
+const afterMalakar = { type: 'spawn', id: 'afterMalakar', tile: [27, 13], facing: Math.PI };
 
 export default {
   id: 'castle',
@@ -85,5 +87,5 @@ export default {
   torchIntensity: 9,
   music: { root: 50, scale: [0, 2, 3, 5, 7, 8, 11], tempo: 78, prog: [0, 5, 3, 4, 0, 5, 6, 4], lead: 'sawtooth', pad: 'triangle' },
   map,
-  entities: [...entities, ...npcs, returnPortal],
+  entities: [...entities, ...npcs, returnPortal, afterMalakar],
 };
