@@ -25,6 +25,7 @@ export class Input {
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
     this.locked = false;
     this.touch = { active: false, moveX: 0, moveY: 0 };
+    this.padMove = { x: 0, y: 0 }; // palanca izquierda del mando (aparte del joystick táctil)
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
     this.enabled = true;
 
@@ -71,6 +72,10 @@ export class Input {
   addLook(dx, dy) { this.mouseDX += dx; this.mouseDY += dy; }
   press(action) { this.pressedSet.add(action); this.down.add(action); }
   release(action) { this.down.delete(action); }
+  /** Palanca izquierda del mando, en [-1,1]. */
+  setPadMove(x, y) { this.padMove.x = x; this.padMove.y = y; }
+  /** Pulsación de un solo frame (p. ej. el ataque automático). */
+  tap(action) { this.pressedSet.add(action); }
 
   isDown(a) { return this.enabled && this.down.has(a); }
   pressed(a) { return this.enabled && this.pressedSet.has(a); }
@@ -85,7 +90,7 @@ export class Input {
     if (this.down.has('right')) x += 1;
     if (this.down.has('up')) y += 1;
     if (this.down.has('down')) y -= 1;
-    x += this.touch.moveX; y += this.touch.moveY;
+    x += this.touch.moveX + this.padMove.x; y += this.touch.moveY + this.padMove.y;
     const l = Math.hypot(x, y);
     if (l > 1) { x /= l; y /= l; }
     return { x, y };

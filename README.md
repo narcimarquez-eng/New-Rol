@@ -41,6 +41,16 @@ primera visita guarda el juego). Al publicar una versión nueva, se actualiza so
 | Menú (inventario, misiones, mapa) | Tab / I | ☰ |
 | Pausa | Esc / P | ☰ |
 
+**Mando** (Gamepad API, mapeo estándar; por ejemplo el de Luna o un mando Bluetooth):
+palanca izquierda = moverse (también la cruceta), derecha = cámara, A = hablar, X / RT = atacar,
+B = esquivar, Y = poción, LB / LT = bloquear (mantener), RB = correr (mantener), Back = menú,
+Start = pausa. Sin mando, nada cambia. El mando se lee en `src/core/Pad.js`; no se ha probado con
+hardware real, solo con un mando simulado (`tests/gamepad.mjs`).
+
+**Ataque automático** (menú de pausa, «Ataque automático»): cuando hay un enemigo al alcance de la
+espada, el héroe golpea solo y el combo sigue mientras haya enemigos cerca. Sirve para jugar con
+un solo botón; la preferencia se guarda en el navegador.
+
 ## Cómo se juega
 
 - **Vida** en corazones (se pierde de medio en medio). Recupérala con corazones que
@@ -272,6 +282,7 @@ node tests/monsters.mjs   # galería de los monstruos animados (test-results/mon
 python3 tools/gen_desert.py --check   # comprueba que todo el desierto es alcanzable
 node tests/data.mjs  # validación de los datos de las zonas
 node tests/phase5.mjs  # fase 5 de punta a punta: regreso, despedida y volcán (Playwright)
+node tests/gamepad.mjs  # mando simulado: palancas, botones, pausa y ataque automático (Playwright)
 node tests/caves-quick.mjs   # traza rápida del puzle de bloques de las cuevas
 node tests/shots.mjs '[{"zone":"caves","c":22,"r":45}]'   # capturas para revisión visual
 python3 tools/genmaps.py caves   # regenera el mapa de las cuevas y verifica los puzles

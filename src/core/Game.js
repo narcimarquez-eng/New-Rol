@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { Renderer } from './Renderer.js';
 import { Input } from './Input.js';
+import { Pad } from './Pad.js';
 import { Audio } from './Audio.js';
 import { EventBus } from './EventBus.js';
 import { Save } from './Save.js';
@@ -35,6 +36,10 @@ const MAX_LIGHTS = 6;
 // Lo que el héroe suele llevar al terminar la fase 4 (atajo «Ir al Volcán»): mejoras y objetos.
 const VOLCANO_KIT = [['heart_container', 8], ['stamina_up', 3], ['sword_up', 1], ['sword_steel', 1], ['potion', 3], ['coin', 150]];
 
+// Ataque automático: la preferencia se guarda en este navegador (si hay almacenamiento).
+const AUTO_KEY = 'newrol-auto-attack';
+const loadAutoAttack = () => { try { return localStorage.getItem(AUTO_KEY) === '1'; } catch { return false; } };
+
 export class Game {
   constructor(container) {
     const params = new URLSearchParams(location.search);
@@ -44,6 +49,8 @@ export class Game {
     this.scene = this.gfx.scene;
     this.camera = this.gfx.camera;
     this.input = new Input(this.gfx.renderer.domElement);
+    this.pad = new Pad(this.input, () => this.ui?.toast('Mando conectado'));
+    this.autoAttack = loadAutoAttack();
     this.audio = new Audio();
     this.events = new EventBus();
     this.progress = new Progress();
@@ -706,6 +713,22 @@ export class Game {
     }
   }
 
+  /** Ataque automático: con un enemigo al alcance de la espada, el héroe golpea solo. */
+  autoAttackTick(dt) {
+    this.autoCooldown = Math.max(0, (this.autoCooldown || 0) - dt);
+    const p = this.player;
+    if (this.autoCooldown > 0 || p.blocking || p.state === 'dead' || p.state === 'hurt') return;
+    if (!this.enemies.some((e) => e.alive && !e.removed && Math.hypot(e.x - p.x, e.z - p.z) < 3.2)) return;
+    this.input.tap('attack');
+    this.autoCooldown = 0.42; // un golpe cada 0,42 s: el combo sigue solo mientras haya enemigos cerca
+  }
+
+  toggleAutoAttack() {
+    this.autoAttack = !this.autoAttack;
+    try { localStorage.setItem(AUTO_KEY, this.autoAttack ? '1' : '0'); } catch { /* sin almacenamiento */ }
+    this.ui.toast(`Ataque automático: ${this.autoAttack ? 'sí' : 'no'}`);
+  }
+
   usePotion() {
     const p = this.player, pr = this.progress;
     if (!pr.has('potion')) { this.ui.toast('No tienes pociones.'); return; }
@@ -779,6 +802,7 @@ export class Game {
     GLOBAL.time.value = this.time;
     GLOBAL.playerPos.value.copy(this.player.pos);
     const inp = this.input;
+    this.pad.poll(dt);
 
     if (this.mode === 'title') {
       // cámara lenta orbitando la aldea
@@ -812,6 +836,7 @@ export class Game {
     if (simulate) {
       this.progress.playTime += dt;
       if (playing) {
+        if (this.autoAttack) this.autoAttackTick(dt);
         this.player.update(simDt, inp, this.cam.yaw);
         if (inp.consume('potion')) this.usePotion();
       } else {

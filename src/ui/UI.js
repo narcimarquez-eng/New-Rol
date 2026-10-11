@@ -32,6 +32,8 @@ export class UI {
     $('btn-save').addEventListener('click', () => { game.save(); this.toast('Partida guardada'); });
     $('btn-title').addEventListener('click', () => game.toTitle());
     $('btn-mute').addEventListener('click', () => { const m = game.audio.toggleMute(); $('btn-mute').textContent = `Sonido: ${m ? 'no' : 'sí'}`; });
+    $('btn-auto').textContent = `Ataque automático: ${game.autoAttack ? 'sí' : 'no'}`;
+    $('btn-auto').addEventListener('click', () => { game.toggleAutoAttack(); $('btn-auto').textContent = `Ataque automático: ${game.autoAttack ? 'sí' : 'no'}`; });
     $('shop-close').addEventListener('click', () => this.closeShop());
     document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => this.showTab(t.dataset.tab)));
     $('dialog').addEventListener('click', (e) => { if (!e.target.classList.contains('btn')) this.advanceDialog(); });
