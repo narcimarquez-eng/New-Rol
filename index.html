@@ -19,6 +19,36 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="./src/style.css" />
+  <script>
+    // Diagnóstico visible en el propio móvil: si el juego no llega a arrancar, el aviso de
+    // carga muestra el error en lugar de quedarse en «Cargando…».
+    (function () {
+      function fail(msg) {
+        var el = document.getElementById('loading');
+        if (!el || (window.__game && window.__game.firstFrameAt)) return;
+        el.classList.remove('hidden');
+        el.style.color = '#ff8a80';
+        el.textContent = 'No arranca: ' + String(msg).slice(0, 240);
+      }
+      // scripts o hojas de estilo que no se cargan (las capturamos en fase de captura)
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && t !== window && (t.tagName === 'SCRIPT' || (t.tagName === 'LINK' && t.rel === 'stylesheet'))) {
+          fail('no se pudo cargar ' + (t.src || t.href));
+        } else if (e.message) {
+          fail(e.message);
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        fail((e.reason && e.reason.message) || e.reason || 'promesa rechazada');
+      });
+      // si tarda mucho sin error, avisa de que puede ser lentitud y no un fallo
+      setTimeout(function () {
+        var el = document.getElementById('loading');
+        if (el && !window.__game && el.textContent === 'Cargando…') el.textContent = 'Sigue cargando… espera un poco más';
+      }, 40000);
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>
