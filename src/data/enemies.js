@@ -186,6 +186,16 @@ export const ENEMIES = {
     cooldown: 1.4, windup: 0.45, knockback: 5, color: 0x5a4438,
     drops: [['coin5', 0.4], ['ember', 0.3]],
   },
+  // Dragón de brasa: nace del volcán tras la elección (ver src/entities/Dragon.js). La piel de
+  // brasa no se hiere con la espada: hay que congelarlo con cristales de hielo lanzados (G).
+  dragon: {
+    name: 'Dragón de Brasa', model: 'dragon', ai: 'dragon', hp: 48, dmg: 4, speed: 2.4, sight: 40, attackRange: 3.4, radius: 2.4,
+    cooldown: 1.4, windup: 0.7, knockback: 0.5, boss: true, color: 0xff6a20, frostGuard: true,
+    monster: { name: 'dragon', height: 6, headBone: 'cabeza', chestBone: 'pecho', walkPace: 0.5, runPace: 1.2, puff: 0xff8a3a,
+      clips: { idle: 'reposo', walk: 'aleteo', run: 'aleteo', hurt: 'golpe', death: 'muerte' } },
+    clips: { swing: 'ataque', slam: 'ataque', throw: 'ataque' },
+    drops: [['heart_container', 1]],
+  },
   ignar: {
     name: 'Ignar, el Coloso de Magma', model: 'golem', ai: 'golem', hp: 84, dmg: 3, speed: 2.2, sight: 22, attackRange: 4.6, radius: 1.8,
     cooldown: 1.3, windup: 0.75, knockback: 0.4, boss: true, color: 0x3a2622,

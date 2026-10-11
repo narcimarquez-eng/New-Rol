@@ -59,6 +59,8 @@ export class UI {
     $('stamina').classList.toggle('exhausted', p.exhausted);
     $('coins').textContent = pr.coins;
     $('potions').textContent = pr.count('potion');
+    $('frost').textContent = pr.count('frost_crystal');
+    $('frost-counter').classList.toggle('hidden', pr.count('frost_crystal') === 0);
     const keys = ['key_small', 'key_maze', 'key_forest'].filter((k) => pr.count(k) > 0)
       .map((k) => `<span title="${ITEMS[k].name}" style="color:#${ITEMS[k].color.toString(16).padStart(6, '0')}">🗝️${pr.count(k) > 1 ? '×' + pr.count(k) : ''}</span>`).join(' ');
     $('keys-counter').innerHTML = keys;

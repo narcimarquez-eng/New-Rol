@@ -73,7 +73,7 @@ const npcs = [
       'Desde que cayó Malakar, la montaña respira fuego. Dicen que su última sombra se hundió en el cráter.',
       'Desde aquí se ve el cráter. Ahí dentro hay algo que late como un corazón, y cada latido levanta humo.',
     ] }] },
-  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_sombras'],
+  { type: 'npc', id: 'ardea', name: 'Ardea, espíritu de la forja', tile: [37, 16], look: LOOKS.ardea, facing: Math.PI, quests: ['q_sombras', 'q_hielo'],
     talk: [
       { when: { notFlag: 'ardea_lore' }, lines: [
         'Este era el taller de los sellos. Hace siglos, mis hermanos forjaron con brasa de este volcán los tres sellos de la Gran Puerta.',
@@ -98,8 +98,11 @@ const ardeaSpirit = { type: 'npc', id: 'ardea_spirit', name: 'Ardea, espíritu d
       { label: 'Destruirla', do: [{ flag: 'v_destroy' }, { flag: 'v_choice_done' }] },
       { label: 'Sellarla', do: [{ flag: 'v_seal' }, { flag: 'v_choice_done' }] },
     ] },
-    { when: { flag: 'v_destroy' }, lines: ['La brasa se ha deshecho en luz. La montaña respira tranquila por primera vez en días.', 'Sal por la salida del norte. Gracias, forastero.'] },
-    { lines: ['La brasa duerme en su urna de obsidiana, bajo el cráter.', 'No la despiertes nunca más. Sal por la grieta del norte.'] },
+    { when: { all: [{ flag: 'v_destroy' }, { notFlag: 'dragon_defeated' }] }, lines: ['¡La brasa se resiste! La roca se rompe y de ella sale un dragón de brasa.', 'Derrótalo, héroe. Lánzale cristales de hielo (G) para congelarlo y golpéalo mientras está helado.'] },
+    { when: { all: [{ flag: 'v_destroy' }, { flag: 'dragon_defeated' }] }, lines: ['La brasa se ha deshecho en luz. La montaña respira tranquila por primera vez en días.', 'Sal por la salida del norte. Gracias, forastero.'] },
+    { when: { all: [{ flag: 'v_seal' }, { notFlag: 'dragon_defeated' }] }, lines: ['¡La urna se agrieta! Del fondo del cráter sale un dragón de brasa.', 'Derrótalo, héroe. Lánzale cristales de hielo (G) para congelarlo y golpéalo mientras está helado.'] },
+    { when: { all: [{ flag: 'v_seal' }, { flag: 'dragon_defeated' }] }, lines: ['La brasa duerme en su urna de obsidiana, bajo el cráter.', 'No la despiertes nunca más. Sal por la grieta del norte.'] },
+    { lines: ['La montaña está en calma. Sal por la salida que elegiste.'] },
   ] };
 
 const entities = [
@@ -107,13 +110,13 @@ const entities = [
   { type: 'spawn', id: 'fromVillage', tile: [20, 56], facing: Math.PI },
   { type: 'portal', tile: [20, 59], span: 2, to: 'village', spawn: 'fromVolcano', label: 'Aldea Inicial' },
   // dos salidas del cráter: aparece una u otra según lo que decidas con la Brasa Negra
-  { type: 'portal', tile: [14, 4], span: 2, to: 'credits', flag: 'volcano_complete', when: { flag: 'v_destroy' }, label: 'Cima del volcán',
+  { type: 'portal', tile: [14, 4], span: 2, to: 'credits', flag: 'volcano_complete', when: { all: [{ flag: 'v_destroy' }, { flag: 'dragon_defeated' }] }, label: 'Cima del volcán',
     ending: {
       title: '¡El volcán se apaga!',
       tagline: 'La Brasa Negra se deshace en chispas y la ceniza deja de caer sobre la aldea.',
       text: 'Desde la cima se ve la aldea, pequeña y tranquila. Kael, Borg, Sir Aldric y Sir Cedric te esperan abajo, cada uno en su puesto.<br/><b>¡Gracias por jugar a New Rol!</b>',
     } },
-  { type: 'portal', tile: [26, 4], span: 2, to: 'credits', flag: 'volcano_complete', when: { flag: 'v_seal' }, label: 'Grieta sellada',
+  { type: 'portal', tile: [26, 4], span: 2, to: 'credits', flag: 'volcano_complete', when: { all: [{ flag: 'v_seal' }, { flag: 'dragon_defeated' }] }, label: 'Grieta sellada',
     ending: {
       title: '¡El volcán duerme!',
       tagline: 'Ardea sella la brasa en una urna de obsidiana, bajo el cráter.',
@@ -147,9 +150,18 @@ const entities = [
   { type: 'pickup', id: 'v_shard1', item: 'shadow_shard', tile: [36, 31] },
   { type: 'pickup', id: 'v_shard2', item: 'shadow_shard', tile: [27, 18] },
   { type: 'pickup', id: 'v_shard3', item: 'shadow_shard', tile: [9, 45] },
+  // cristales de hielo entre las piedras negras (misión de Ardea; sirven contra el dragón)
+  { type: 'pickup', id: 'v_frost1', item: 'frost_crystal', tile: [3, 40] },
+  { type: 'pickup', id: 'v_frost2', item: 'frost_crystal', tile: [6, 47] },
+  { type: 'pickup', id: 'v_frost3', item: 'frost_crystal', tile: [11, 52] },
+  { type: 'pickup', id: 'v_frost4', item: 'frost_crystal', tile: [31, 54] },
+  { type: 'pickup', id: 'v_frost5', item: 'frost_crystal', tile: [37, 49] },
+  { type: 'pickup', id: 'v_frost6', item: 'frost_crystal', tile: [26, 42] },
 
   // --- jefe final de la fase 5 ---
   { type: 'enemy', kind: 'ignar', id: 'boss_volcano', tile: [19, 7], flag: 'boss_volcano', arena: [11, 4, 32, 10] },
+  // dragón de brasa: sale del volcán después de la elección (rompe la roca); hay que vencerlo para salir
+  { type: 'enemy', kind: 'dragon', id: 'dragon_brasa', tile: [19, 7], flag: 'dragon_defeated', when: { flag: 'v_choice_done', notFlag: 'dragon_defeated' }, arena: [11, 4, 32, 10], emerge: true },
 
   // --- enemigos: ladera, cuenca y plateau ---
   { type: 'enemy', kind: 'lavaSlime', tile: [5, 28] },

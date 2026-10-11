@@ -164,9 +164,21 @@ ok(true, 'tras el jefe aparece el espíritu de Ardea (sin recargar la zona)');
 const exitsBefore = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').length);
 ok(exitsBefore === 0, 'todavía no hay salidas: la decisión abre una');
 await talk('ardea_spirit', 0);
+// tras la elección nace el dragón de brasa; la salida elegida espera a que caiga
+await page.waitForFunction(() => window.__game.enemies.some((e) => e.kind === 'dragon'), null, { timeout: 20000 });
+ok(true, 'tras la elección, el dragón de brasa nace del volcán (sin recargar la zona)');
+const exitsAlive = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').length);
+ok(exitsAlive === 0, 'mientras el dragón vive, la salida todavía no aparece');
+// la espada no le hiere mientras no está congelado; un cristal de hielo lo congela
+ok(await page.evaluate(() => { const g = window.__game; return g.enemies.find((e) => e.kind === 'dragon').hurt(3, g.player.x, g.player.z); }) === 'blocked',
+  'la espada no hiere al dragón de brasa sin congelarlo');
+await page.evaluate(() => window.__game.enemies.find((e) => e.kind === 'dragon').frost(1));
+ok(await page.evaluate(() => window.__game.enemies.find((e) => e.kind === 'dragon').frozenT > 0), 'un cristal de hielo lo congela (y la espada le hace daño mientras dure)');
+// derrota: se abre la salida que se eligió
+await page.evaluate(() => window.__game.enemies.find((e) => e.kind === 'dragon').frost(999));
 await page.waitForFunction(() => window.__game.interactables.some((i) => i.data && i.data.to === 'credits'), null, { timeout: 20000 });
 const exits = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').map((i) => i.data.label));
-ok(exits.join('|') === 'Cima del volcán', `destruir la Brasa Negra abre la Cima del volcán (${exits.join(', ')})`);
+ok(exits.join('|') === 'Cima del volcán', `vencido el dragón, se abre la Cima del volcán (${exits.join(', ')})`);
 ok(await page.evaluate(() => /salida/i.test(window.__game.currentObjective())), 'el objetivo pide salir por la salida elegida');
 
 // 9) volver a la aldea desde el volcán: la despedida ya no se repite y los amigos siguen en la plaza

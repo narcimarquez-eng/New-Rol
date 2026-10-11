@@ -15,7 +15,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
 
 const BASE = `${import.meta.env.BASE_URL}assets/monsters/`;
-export const MONSTERS = ['slime', 'iceslime', 'bat', 'frostbat', 'plant', 'goblin', 'goblinking', 'spirit', 'golem'];
+export const MONSTERS = ['slime', 'iceslime', 'bat', 'frostbat', 'plant', 'goblin', 'goblinking', 'spirit', 'golem', 'dragon'];
 
 const lib = { models: new Map(), ready: false };
 

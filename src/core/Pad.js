@@ -15,6 +15,7 @@ const BUTTONS = [      // [acción, botón estándar]
   ['attack', 7],       // RT: atacar
   ['menu', 8],         // Back: menú
   ['pause', 9],        // Start: pausa
+  ['throw', 10],       // L3 (pulsar la palanca izquierda): lanzar cristal de hielo
 ];
 const DPAD = [[12, 0, 1], [13, 0, -1], [14, -1, 0], [15, 1, 0]]; // [botón, x, y] de la cruceta
 

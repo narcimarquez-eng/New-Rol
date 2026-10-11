@@ -13,6 +13,7 @@ const KEYMAP = {
   Escape: 'pause', KeyP: 'pause',
   Tab: 'menu', KeyI: 'menu', KeyJ: 'menu',
   KeyF: 'attack', KeyK: 'attack',
+  KeyG: 'throw',
   KeyR: 'block', KeyL: 'block',
   KeyM: 'map',
 };

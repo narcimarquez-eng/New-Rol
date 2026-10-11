@@ -10,6 +10,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { buildEnemyModel } from './EnemyModels.js';
 import { dampAngle, angleDiff } from '../core/utils.js';
 import { TILE } from '../world/tiles.js';
+import { updateDragon } from './Dragon.js';
 
 const DEFAULT_AI = { slime: 'hop', bat: 'swoop', plant: 'bite', goblin: 'melee', goblinKing: 'boss', wolf: 'lunge', spirit: 'ranged', golem: 'golem' };
 
@@ -54,6 +55,8 @@ export class Enemy {
     this.flyY = def.flying ? (def.flyHeight ?? 2.2) : 0;
     this.kk = this.m.kk || null; // modelo KayKit (esqueletos)
     // esqueletos enterrados: esperan en la arena y se levantan al acercarse el héroe
+    // el dragón sale del suelo: empieza bajo la roca
+    if (spawn.emerge) { this.state = 'emerge'; this.stateT = 0; }
     if (def.dormant) {
       if (spawn.summoned) { this.state = 'awaken'; this.stateT = 0; }
       else { this.state = 'dormant'; this.dormant = true; }
@@ -102,6 +105,11 @@ export class Enemy {
         return 'blocked';
       }
     }
+    // piel de brasa: la espada no la hiere mientras no está congelada (cristales de hielo)
+    if (this.def.frostGuard && !(this.frozenT > 0)) {
+      this.game.particles.hit(this.pos.x, this.pos.y + 2.5, this.pos.z, 0x9fe7ff);
+      return 'blocked';
+    }
     this.hp -= dmg;
     const d = Math.hypot(this.pos.x - fromX, this.pos.z - fromZ) || 1;
     const k = this.def.knockback;
@@ -115,6 +123,16 @@ export class Enemy {
       else if (this.phase === 2 && !this.shielded && this.hp <= this.maxHp * 0.33) this.enterPhase3();
     } else if (this.def.boss && this.phase === 1 && this.hp <= this.maxHp / 2) this.enterPhase2();
     return 'hit';
+  }
+
+  /** Cristal de hielo: congela unos segundos (no ataca ni se mueve) y le quita un poco de vida. */
+  frost(dmg) {
+    if (!this.alive || this.dormant || this.state === 'awaken') return 'ignored';
+    this.frozenT = 5;
+    this.game.particles.burst(this.pos.x, this.pos.y + 2.5, this.pos.z, { count: 16, colors: [0x9fe7ff, 0xffffff], speed: 3, up: 2, life: 0.9, size: 1.2 });
+    this.hp -= dmg;
+    if (this.hp <= 0) { this.die(); return 'hit'; }
+    return 'frozen';
   }
 
   enterPhase2() {
@@ -271,6 +289,12 @@ export class Enemy {
     const g = this.game;
     this.stateT += dt;
     if (this.cool > 0) this.cool -= dt;
+    // el dragón de brasa tiene su propia IA (src/entities/Dragon.js)
+    if (this.ai === 'dragon' && this.state !== 'dead') {
+      if (this.flashT > 0) { this.flashT -= dt; this.setEmissive(this.flashT > 0 ? 0xffffff : 0x000000, 0.9); }
+      updateDragon(this, dt, player);
+      return;
+    }
 
     if (this.state === 'dead') {
       if (this.kk?.monster) {

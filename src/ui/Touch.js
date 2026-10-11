@@ -74,6 +74,7 @@ export class Touch {
     bind('t-dodge', 'dodge');
     bind('t-interact', 'interact');
     bind('t-potion', 'potion');
+    bind('t-throw', 'throw');
   }
 
   setVisible(on) { $('touch').classList.toggle('hidden', !on); }

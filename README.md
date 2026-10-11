@@ -40,11 +40,12 @@ primera visita guarda el juego). Al publicar una versión nueva, se actualiza so
 | Beber poción | Q | 🧪 |
 | Menú (inventario, misiones, mapa) | Tab / I | ☰ |
 | Pausa | Esc / P | ☰ |
+| Lanzar cristal de hielo (congela al dragón de brasa) | G | ❄️ |
 
 **Mando** (Gamepad API, mapeo estándar; por ejemplo el de Luna o un mando Bluetooth):
 palanca izquierda = moverse (también la cruceta), derecha = cámara, A = hablar, X / RT = atacar,
 B = esquivar, Y = poción, LB / LT = bloquear (mantener), RB = correr (mantener), Back = menú,
-Start = pausa. Sin mando, nada cambia. El mando se lee en `src/core/Pad.js`; no se ha probado con
+Start = pausa, L3 (pulsar la palanca izquierda) = lanzar cristal de hielo. Sin mando, nada cambia. El mando se lee en `src/core/Pad.js`; no se ha probado con
 hardware real, solo con un mando simulado (`tests/gamepad.mjs`).
 
 **Ataque automático** (menú de pausa, «Ataque automático»): cuando hay un enemigo al alcance de la
@@ -184,12 +185,18 @@ un solo botón; la preferencia se guarda en el navegador.
   4. **El cráter**: la Puerta del Cráter, el foso de lava y el jefe **Ignar, el Coloso de Magma**
      (2 fases). Al vencerlo aparece Ardea y deja elegir qué hacer con la **Brasa Negra**:
      **destruirla** (salida «Cima del volcán») o **sellarla** (salida «Grieta sellada»). Cada salida
-     tiene su propio final.
+     tiene su propio final. Para salir de cualquiera de las dos hay que vencer antes al **dragón de
+     brasa**, que nace del volcán rompiendo la roca entre chorros de lava: escupe fuego en un cono
+     que se avisa antes (hay que apartarse), ataca de cerca y lanza bolas de lava. Su piel no se
+     hiere con la espada: hay que lanzarle **cristales de hielo** (G) para congelarlo. Congelado no
+     ataca, y entonces la espada sí le hace daño.
 - **Volcán del horizonte** (`src/gfx/Landmark.js`): una silueta con cráter, coladas de lava y humo,
   visible desde la cuenca. La cámara de esta zona baja un poco (`camera.pitch`) para encuadrarlo.
 - **Lava** incandescente y animada (`src/gfx/Lava.js`); no se puede pisar.
-- **Misiones** (6): Brasas para la forja y Limos de lava (Hana), Agua para Teo (de Nuria a Teo),
-  Vidrio de volcán (Teo), El muñeco de Pipo (Pipo) y Fragmentos de sombra (Ardea).
+- **Misiones** (7): Brasas para la forja y Limos de lava (Hana), Agua para Teo (de Nuria a Teo),
+  Vidrio de volcán (Teo), El muñeco de Pipo (Pipo), Fragmentos de sombra (Ardea) y **Cristales de
+  hielo** (Ardea): seis cristales entre las piedras negras de la cuenca, que no se gastan al entregarlos
+  y son los que necesitas contra el dragón.
 - Las reglas de diálogo (`talk`) admiten `choices`: cada opción ejecuta sus acciones (`do`).
   Así se elige entre destruir y sellar la brasa.
 

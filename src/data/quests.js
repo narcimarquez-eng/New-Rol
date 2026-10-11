@@ -270,4 +270,16 @@ export const QUESTS = {
       done: ['Ve al cráter con cuidado. Ignar no es un monstruo: es nuestro guardián.'],
     },
   },
+  q_hielo: {
+    name: 'Cristales de hielo', zone: 'volcano', giver: 'ardea', type: 'collect', item: 'frost_crystal', count: 6, consume: false,
+    requires: { flag: 'ardea_lore' },
+    desc: 'Ardea necesita 6 cristales de hielo para el dragón de brasa. Hay cristales escondidos entre las piedras negras de la cuenca. Esta vez no se gastan: los necesitarás en el cráter.',
+    reward: [['heart_container', 1], ['potion', 2]],
+    lines: {
+      offer: ['El dragón de brasa no se hiere con acero. Solo el hielo lo detiene.', 'Hay cristales de hielo entre las piedras negras de la cuenca. Tráeme seis.'],
+      active: ['Brillan con luz fría entre las piedras de la cuenca. Busca bien.'],
+      complete: ['¡Seis! Con estos el dragón no podrá escapar del hielo.', 'Guárdalos bien: lánzalos con G y golpea mientras esté congelado.'],
+      done: ['Los cristales están listos. Ahora solo falta que el dragón despierte.'],
+    },
+  },
 };

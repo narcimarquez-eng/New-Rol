@@ -51,6 +51,7 @@ export class Game {
     this.input = new Input(this.gfx.renderer.domElement);
     this.pad = new Pad(this.input, () => this.ui?.toast('Mando conectado'));
     this.autoAttack = loadAutoAttack();
+    this.frostShards = []; // cristales de hielo lanzados (solo los necesita el dragón)
     this.audio = new Audio();
     this.events = new EventBus();
     this.progress = new Progress();
@@ -330,6 +331,9 @@ export class Game {
 
   // ------------------------------------------------------------------ zonas
   loadZone(id, spawnId, { silent = false } = {}) {
+    // cristales en vuelo de la zona anterior
+    for (const f of this.frostShards) this.scene.remove(f.mesh);
+    this.frostShards = [];
     // limpiar zona anterior
     if (this.zone) {
       this.scene.remove(this.zone.group);
@@ -374,6 +378,7 @@ export class Game {
           break;
         case 'enemy':
           if (e.flag && this.progress.flags.has(e.flag)) break; // jefe ya derrotado
+          if (e.when && !this.progress.check(e.when)) break; // aparece más tarde (ver refreshWhenEntities)
           this.spawnEnemy(e);
           break;
         default: break;
@@ -515,7 +520,11 @@ export class Game {
    */
   refreshWhenEntities() {
     for (const e of this.zone.data.entities) {
-      if (!e.when || (e.type !== 'portal' && e.type !== 'npc') || !this.progress.check(e.when)) continue;
+      if (!e.when || !['portal', 'npc', 'enemy'].includes(e.type) || !this.progress.check(e.when)) continue;
+      if (e.type === 'enemy') { // un enemigo que aparece con una bandera (el dragón) nace una sola vez
+        if (!this.enemies.some((x) => x.spawn === e)) this.spawnEnemy(e);
+        continue;
+      }
       if (this.interactables.some((i) => i.data === e || (e.type === 'npc' && i.id === e.id))) continue;
       this.addInteractable(e.type === 'portal' ? new Portal(this, e) : new NPC(this, e));
     }
@@ -723,6 +732,35 @@ export class Game {
     this.autoCooldown = 0.42; // un golpe cada 0,42 s: el combo sigue solo mientras haya enemigos cerca
   }
 
+  /** Lanza un cristal de hielo hacia donde mira el héroe (tecla G, L3 o el botón ❄️). */
+  throwFrost() {
+    const p = this.player;
+    if (!this.progress.has('frost_crystal') || p.state === 'dead' || this.mode !== 'play') return;
+    this.progress.take('frost_crystal');
+    const s = Math.sin(p.facing), c = Math.cos(p.facing);
+    const mesh = new THREE.Mesh(this.frostGeo || (this.frostGeo = new THREE.OctahedronGeometry(0.35, 0)),
+      new THREE.MeshBasicMaterial({ color: 0x9fe7ff, toneMapped: false }));
+    mesh.position.set(p.x + s * 1.2, p.pos.y + 1.4, p.z + c * 1.2);
+    this.scene.add(mesh);
+    this.frostShards.push({ mesh, x: mesh.position.x, y: mesh.position.y, z: mesh.position.z, vx: s * 24, vz: c * 24, life: 1.2 });
+    this.audio.sfx('select');
+  }
+
+  /** Cristales en vuelo: si tocan al dragón lo congelan; si no, caen tras un momento. */
+  updateFrost(dt) {
+    this.frostShards = this.frostShards.filter((f) => {
+      f.life -= dt;
+      f.x += f.vx * dt; f.z += f.vz * dt;
+      f.mesh.position.set(f.x, f.y, f.z);
+      f.mesh.rotation.y += dt * 12;
+      const hit = this.enemies.find((e) => e.alive && !e.removed && e.def.frostGuard
+        && Math.hypot(e.x - f.x, e.z - f.z) < e.radius + 0.6 && f.y < e.pos.y + 6);
+      if (hit) { hit.frost(2); this.particles.hit(f.x, f.y, f.z, 0x9fe7ff); }
+      if (hit || f.life <= 0) { this.scene.remove(f.mesh); return false; }
+      return true;
+    });
+  }
+
   toggleAutoAttack() {
     this.autoAttack = !this.autoAttack;
     try { localStorage.setItem(AUTO_KEY, this.autoAttack ? '1' : '0'); } catch { /* sin almacenamiento */ }
@@ -836,6 +874,7 @@ export class Game {
     if (simulate) {
       this.progress.playTime += dt;
       if (playing) {
+        if (inp.consume('throw')) this.throwFrost();
         if (this.autoAttack) this.autoAttackTick(dt);
         this.player.update(simDt, inp, this.cam.yaw);
         if (inp.consume('potion')) this.usePotion();
@@ -845,6 +884,7 @@ export class Game {
       for (const c of this.companions) c.update(simDt);
       this.storm.update(simDt);
       for (const e of this.enemies) e.update(simDt, this.player);
+      this.updateFrost(simDt);
       this.projectiles.update(simDt);
       this.combat.separate();
       this.enemies = this.enemies.filter((e) => {
