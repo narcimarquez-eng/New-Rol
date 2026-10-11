@@ -210,6 +210,8 @@ try {
     if (!w) return null;
     window.__t.tp(27, 19.6); // orilla norte del estanque
     g.step(1 / 60);
+    // la ballena da saltos al azar y sin aviso mientras salta: se espera a que esté bajo el agua
+    for (let k = 0; k < 900 && w.B.active; k++) g.step(1 / 60);
     const prompt = w.prompt;
     w.interact();
     let maxSpray = 0, maxY = -99, foam = 0;
