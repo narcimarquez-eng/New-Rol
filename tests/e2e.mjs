@@ -183,6 +183,7 @@ try {
   const cameraReport = () => page.evaluate(() => {
     const g = window.__game, z = g.zone, col = z.collision;
     let bad = 0, n = 0;
+    const fails = []; // muestras malas: posición y ángulo, para reproducir el fallo
     // casillas que activan un portal: el jugador nunca se queda ahí (cambia de zona al instante)
     const portals = g.interactables.filter((it) => it.constructor.name === 'Portal' || it.data?.type === 'portal');
     const onPortal = (x, zz) => portals.some((pt) => Math.abs(x - pt.x) < pt.width / 2 + 0.6 && Math.abs(zz - pt.z) < 2.8);
@@ -196,13 +197,13 @@ try {
       for (let k = 0; k < 40; k++) g.cam.update(1 / 60, { mouseDX: 0, mouseDY: 0, wheel: 0 }, g.player, z);
       const cp = g.camera.position;
       n++;
-      if (cp.y < z.height(cp.x, cp.z) + 0.3) bad++;
-      else if (col.blocksView(cp.x, cp.z, cp.y - z.height(cp.x, cp.z))) bad++;
+      if (cp.y < z.height(cp.x, cp.z) + 0.3) { bad++; fails.push({ c, r, yaw: +g.cam.yaw.toFixed(2), pitch: +g.cam.pitch.toFixed(2), camY: +cp.y.toFixed(2), ground: +z.height(cp.x, cp.z).toFixed(2) }); }
+      else if (col.blocksView(cp.x, cp.z, cp.y - z.height(cp.x, cp.z))) { bad++; fails.push({ c, r, yaw: +g.cam.yaw.toFixed(2), pitch: +g.cam.pitch.toFixed(2), camY: +cp.y.toFixed(2), ground: +z.height(cp.x, cp.z).toFixed(2), view: true }); }
     }
-    return { bad, n };
+    return { bad, n, fails };
   });
   const camV = await cameraReport();
-  ok(camV.bad === 0, `Aldea: cámara correcta en ${camV.n} posiciones (${camV.bad} fallos)`);
+  ok(camV.bad === 0, `Aldea: cámara correcta en ${camV.n} posiciones (${camV.bad} fallos)${camV.bad ? ' ' + JSON.stringify(camV.fails[0]) : ''}`);
 
   // ---------- la ballena del estanque ----------
   const whale = await page.evaluate(() => {
