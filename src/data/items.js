@@ -38,4 +38,6 @@ export const ITEMS = {
   ember: { name: 'Brasa de magma', kind: 'quest', color: 0xff7a20, icon: '🔥', desc: 'Una brasa que nunca se apaga. Hana la necesita para encender su forja.' },
   obsidian: { name: 'Obsidiana', kind: 'quest', color: 0x4a3a5a, icon: '🖤', desc: 'Vidrio negro de volcán, afilado como una navaja. Teo lo colecciona.' },
   water_flask: { name: 'Frasco de agua fresca', kind: 'quest', color: 0x7fd6ff, icon: '💧', desc: 'Agua de la fuente del pie del volcán. Es para Teo, que se ha quedado sin nada.' },
+  rag_doll: { name: 'Muñeco de trapo', kind: 'quest', color: 0xe8b04a, icon: '🧸', desc: 'Un muñeco de trapo con un botón por ojo y una oreja rota. Pipo no se separa de él.' },
+  shadow_shard: { name: 'Fragmento de sombra', kind: 'quest', color: 0x2a1f3a, icon: '🌑', desc: 'Un trozo de la sombra de Malakar. No refleja la luz y tiembla al tacto.' },
 };

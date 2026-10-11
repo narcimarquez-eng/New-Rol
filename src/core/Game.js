@@ -385,6 +385,8 @@ export class Game {
     this.lastSpawn = spawn.id;
     this.spawnCompanions();
     this.cam.snapBehind(this.player);
+    // zonas que quieren otro ángulo (el volcán enseña su silueta sobre el horizonte)
+    if (data.camera?.pitch != null) this.cam.pitch = data.camera.pitch;
     if (!silent) {
       this.audio.playMusic(data.music);
       this.ui.zoneTitle(data.name, data.subtitle);
@@ -582,6 +584,7 @@ export class Game {
     const pr = this.progress;
     const say = (lines, opts = {}) => {
       npc.talking = true;
+      pr.flags.add(`spoke_${npc.id}`); // para la historia: «habla con X» se cumple al hablar
       this.setMode('dialog');
       // el héroe mira a quien le habla
       this.lookTarget = new THREE.Vector3(npc.root.position.x, npc.root.position.y + 1.4, npc.root.position.z);
@@ -619,6 +622,8 @@ export class Game {
     let lines = rule ? rule.lines : ['...'];
     const doneQuest = [...qs].reverse().find((id) => pr.questState(id) === 'done');
     if (doneQuest && (!rule || !rule.when)) lines = QUESTS[doneQuest].lines.done;
+    // reglas con elección (p. ej. destruir o sellar la brasa): cada opción ejecuta sus acciones
+    if (rule?.choices) return say(lines, { choices: rule.choices.map((c) => ({ label: c.label, fn: () => this.runActions(c.do || [], npc) })) });
     const end = () => {
       if (rule?.do) this.runActions(rule.do, npc);
       if (npc.data.heal) this.healFull(npc);

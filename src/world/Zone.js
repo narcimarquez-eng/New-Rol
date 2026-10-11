@@ -14,6 +14,7 @@ import { buildGrass } from './Grass.js';
 import { windMat, instancedOutline, addOutline, spart, smerge, rockify } from '../gfx/ModelKit.js';
 import { REALISTIC } from '../gfx/Style.js';
 import { buildAtmosphere, buildRealWater } from '../gfx/Environment.js';
+import { buildVolcano } from '../gfx/Landmark.js';
 import { buildBackdrop } from '../gfx/Backdrop.js';
 import { treeInstances, variedTrees, barkMat, endGrainMat } from '../gfx/Vegetation.js';
 import { triplanar, rockTextures, woodTextures, snowTextures, iceMaterialReal } from '../gfx/Materials.js';
@@ -75,7 +76,16 @@ export class Zone {
     this.collision = new Collision(this);
     this.buildEnvironment();
     this.buildTiles();
+    this.buildLandmark();
     this.buildStaticEntities();
+  }
+
+  /** Silueta lejana de la zona (el volcán del horizonte): no forma parte del mapa. */
+  buildLandmark() {
+    if (!this.data.landmark) return;
+    const lm = buildVolcano(this.data.landmark);
+    this.group.add(lm.group);
+    this.updaters.push(lm.update);
   }
 
   charAt(c, r) {

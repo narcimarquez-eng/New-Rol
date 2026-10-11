@@ -1,6 +1,7 @@
 // Prueba de la fase 5 sobre el juego real: el atajo «Ir al Volcán» del menú, el final del
 // balcón y el portal de regreso (sin recargar la zona), la despedida de los compañeros en
-// la aldea, el sendero del volcán, la salida del cráter tras el jefe y la vuelta a la aldea.
+// la aldea, el volcán (reja y braseros del puente, misiones de Nuria, Pipo, Hana y Ardea),
+// el jefe, la elección del espíritu de Ardea y la vuelta a la aldea.
 // Uso: node tests/phase5.mjs   (SKIP_BUILD=1 para usar la última compilación;
 // OUTDIR=carpeta para compilar y servir otra copia distinta de dist/)
 import { chromium } from 'playwright-core';
@@ -20,6 +21,20 @@ await page.waitForFunction(() => window.__game && window.__game.firstFrameAt, nu
 
 let fails = 0;
 const ok = (c, m) => { console.log(`${c ? '✔' : '✘'} ${m}`); if (!c) fails++; };
+// habla con un NPC y elige la opción `pick` si el diálogo ofrece elegir (misiones, el espíritu de Ardea)
+const talk = (id, pick = 0) => page.evaluate(([id, pick]) => {
+  const g = window.__game;
+  const npc = g.interactables.find((i) => i.id === id);
+  if (!npc) return 'sin NPC';
+  g.talkTo(npc);
+  for (let n = 0; n < 500 && g.ui.dialog; n++) {
+    const d = g.ui.dialog;
+    if (d.opts.choices && d.full) { g.ui.choose(pick); break; }
+    g.ui.advanceDialog();
+  }
+  return g.ui.dialog ? 'sigue abierto' : 'ok';
+}, [id, pick]);
+const quest = (id) => page.evaluate((id) => window.__game.progress.questState(id), id);
 
 // 1) atajo del menú: el héroe empieza en la sala del trono, con Malakar vencido y el final pendiente
 await page.click('#btn-volcano');
@@ -86,7 +101,7 @@ ok(after.npcs.every(Boolean), 'los compañeros se quedan en la aldea como habita
 ok(after.mode === 'play', 'el juego vuelve al modo de juego tras la despedida');
 ok(/volcán|sendero/i.test(after.objective), `el objetivo principal apunta al volcán (${after.objective})`);
 
-// 4) el sendero del volcán está abierto y lleva al volcán
+// 4) el sendero del volcán lleva a la cuenca; al entrar, el objetivo es hablar con Nuria
 const vol = await page.evaluate(() => {
   const g = window.__game;
   const p = g.interactables.find((i) => i.data && i.data.to === 'volcano');
@@ -100,21 +115,61 @@ const inVolcano = await page.evaluate(() => {
   return {
     flag: g.progress.flags.has('entered_volcano'),
     boss: g.enemies.some((e) => e.spawn && e.spawn.kind === 'ignar'),
+    gate: g.interactables.some((i) => i.data && i.data.id === 'v_bridge' && !i.open),
     door: g.interactables.some((i) => i.data && i.data.id === 'v_crater'),
+    braziers: g.interactables.filter((i) => i.kind === 'brazier' && i.data.group === 'v_fire').length,
     objective: g.currentObjective(),
   };
 });
 ok(inVolcano.flag, 'entrar en el volcán registra la zona');
 ok(inVolcano.boss, 'el jefe Ignar está en el cráter');
+ok(inVolcano.gate, 'la reja del puente empieza cerrada');
 ok(inVolcano.door, 'la Puerta del Cráter está en el mapa');
-ok(/río de lava|llave/i.test(inVolcano.objective), `el objetivo es cruzar el río y buscar la llave (${inVolcano.objective})`);
+ok(inVolcano.braziers === 3, `los tres braseros del puente están en la orilla (${inVolcano.braziers})`);
+ok(/Nuria/.test(inVolcano.objective), `el objetivo es hablar con Nuria (${inVolcano.objective})`);
 
-// 5) al vencer a Ignar, la salida del cráter aparece sin recargar la zona
-await page.evaluate(() => { window.__game.progress.flags.add('boss_volcano'); });
+// 5) el puente: la reja se levanta cuando los tres braseros arden a la vez
+await page.evaluate(() => { window.__game.interactables.filter((i) => i.kind === 'brazier' && i.data.group === 'v_fire').forEach((b) => b.ignite()); });
+await page.waitForFunction(() => window.__game.progress.flags.has('v_bridge_open'), null, { timeout: 15000 });
+await page.evaluate(() => { const g = window.__game; const [x, z] = g.zone.tileToWorld(20, 29); g.player.place(x, z, Math.PI); });
+await page.waitForFunction(() => window.__game.progress.flags.has('opened_v_bridge'), null, { timeout: 30000 });
+ok(true, 'los tres braseros encendidos a la vez levantan la reja del puente');
+
+// 6) misiones de la cuenca y el plateau: Nuria ofrece el frasco, Pipo el muñeco, Hana la forja
+await talk('nuria', 0);
+ok((await quest('q_flask')) === 'active' && (await page.evaluate(() => window.__game.progress.flags.has('spoke_nuria'))), 'Nuria ofrece el frasco de agua para Teo y queda hablada');
+await talk('pipo', 0);
+ok((await quest('q_toy')) === 'active', 'Pipo encarga el muñeco de trapo');
+await page.evaluate(() => window.__game.progress.add('rag_doll', 1));
+ok((await quest('q_toy')) === 'ready', 'al tener el muñeco, la misión de Pipo está lista para entregar');
+await talk('pipo');
+ok((await quest('q_toy')) === 'done', 'Pipo recibe su muñeco y la misión queda terminada');
+await talk('hana', 0);
+ok((await quest('q_ember')) === 'active' && (await page.evaluate(() => window.__game.progress.flags.has('spoke_hana'))), 'Hana ofrece la misión de las brasas');
+
+// 7) Ardea: primero cuenta la historia de la forja; después encarga los fragmentos de sombra
+await talk('ardea');
+ok(await page.evaluate(() => window.__game.progress.flags.has('ardea_lore')), 'Ardea cuenta la historia de la forja y los sellos');
+await talk('ardea', 0);
+ok((await quest('q_shards')) === 'active', 'Ardea encarga recoger tres fragmentos de sombra');
+await page.evaluate(() => window.__game.progress.add('shadow_shard', 3));
+ok((await quest('q_shards')) === 'ready', 'con los tres fragmentos, la misión de Ardea está lista');
+await talk('ardea');
+ok((await quest('q_shards')) === 'done', 'Ardea recibe los fragmentos y la misión queda terminada');
+
+// 8) el cráter: al vencer a Ignar aparece el espíritu de Ardea, y su elección abre una salida
+await page.evaluate(() => { window.__game.progress.flags.add('opened_v_crater'); window.__game.progress.flags.add('boss_volcano'); });
+await page.waitForFunction(() => window.__game.interactables.some((i) => i.id === 'ardea_spirit'), null, { timeout: 20000 });
+ok(true, 'tras el jefe aparece el espíritu de Ardea (sin recargar la zona)');
+const exitsBefore = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').length);
+ok(exitsBefore === 0, 'todavía no hay salidas: la decisión abre una');
+await talk('ardea_spirit', 0);
 await page.waitForFunction(() => window.__game.interactables.some((i) => i.data && i.data.to === 'credits'), null, { timeout: 20000 });
-ok(true, 'tras el jefe aparece la salida del cráter (sin recargar la zona)');
+const exits = await page.evaluate(() => window.__game.interactables.filter((i) => i.data && i.data.to === 'credits').map((i) => i.data.label));
+ok(exits.join('|') === 'Cima del volcán', `destruir la Brasa Negra abre la Cima del volcán (${exits.join(', ')})`);
+ok(await page.evaluate(() => /salida/i.test(window.__game.currentObjective())), 'el objetivo pide salir por la salida elegida');
 
-// 6) volver a la aldea desde el volcán: la despedida ya no se repite y los amigos siguen en la plaza
+// 9) volver a la aldea desde el volcán: la despedida ya no se repite y los amigos siguen en la plaza
 const back = await page.evaluate(() => {
   const g = window.__game;
   const p = g.interactables.find((i) => i.data && i.data.to === 'village');

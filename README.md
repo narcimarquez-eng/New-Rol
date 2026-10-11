@@ -163,15 +163,25 @@ primera visita guarda el juego). Al publicar una versión nueva, se actualiza so
   donde estaba). Desde ese momento el héroe sigue **solo**.
 - **Sendero del volcán**: un camino nuevo al noreste de la aldea, tras la granja de Tomás,
   que se abre al despedirse de los amigos.
-- **Volcán Ardiente**: cuenca de ceniza, ladera con limos de lava, murciélagos de ceniza, espíritus
-  de ascuas y trasgos de ceniza. El **río de lava** solo se cruza por su puente. En el plateau
-  están el campamento de **Hana** (forja) y **Nuria** (refugiada) y el explorador **Teo**.
-  La lava es incandescente y animada (`src/gfx/Lava.js`) y no se puede pisar.
-- **Llave del Volcán**: en una cámara oculta tras un muro falso del campamento.
-- **Cráter**: la Puerta del Cráter, de obsidiana, se abre con la llave. Al otro lado, el foso de
-  lava y el jefe **Ignar, el Coloso de Magma** (2 fases: golpes, ondas de choque, rocas lanzadas y
-  limos de lava de refuerzo).
-- 4 misiones: Brasas para la forja, Limos de lava, Agua para Teo y Vidrio de volcán.
+- **Volcán Ardiente**, en cuatro actos (mapa de 44 × 60 casillas en `src/data/zones/volcano.js`):
+  1. **La cuenca**: el campamento de refugiados de **Nuria**, con su hijo **Pipo**, y los limos,
+     murciélagos y espíritus de ascuas de la ladera.
+  2. **El río de lava**: el puente está cerrado por una reja. Hay que encender a la vez los tres
+     braseros de la orilla (prendiendo la espada en el fuego eterno) para levantarla.
+  3. **El plateau**: la forja de **Hana**, el campamento de **Teo** y la forja antigua de **Ardea**,
+     espíritu de los forjadores de los sellos. La **Llave del Volcán** está en una cámara oculta
+     tras un muro falso.
+  4. **El cráter**: la Puerta del Cráter, el foso de lava y el jefe **Ignar, el Coloso de Magma**
+     (2 fases). Al vencerlo aparece Ardea y deja elegir qué hacer con la **Brasa Negra**:
+     **destruirla** (salida «Cima del volcán») o **sellarla** (salida «Grieta sellada»). Cada salida
+     tiene su propio final.
+- **Volcán del horizonte** (`src/gfx/Landmark.js`): una silueta con cráter, coladas de lava y humo,
+  visible desde la cuenca. La cámara de esta zona baja un poco (`camera.pitch`) para encuadrarlo.
+- **Lava** incandescente y animada (`src/gfx/Lava.js`); no se puede pisar.
+- **Misiones** (6): Brasas para la forja y Limos de lava (Hana), Agua para Teo (de Nuria a Teo),
+  Vidrio de volcán (Teo), El muñeco de Pipo (Pipo) y Fragmentos de sombra (Ardea).
+- Las reglas de diálogo (`talk`) admiten `choices`: cada opción ejecuta sus acciones (`do`).
+  Así se elige entre destruir y sellar la brasa.
 
 ### Gráficos
 

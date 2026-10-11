@@ -247,4 +247,27 @@ export const QUESTS = {
       done: ['Estoy casi seguro de que el volcán va a despertar del todo. Ten mucho cuidado.'],
     },
   },
+  q_toy: {
+    name: 'El muñeco de Pipo', zone: 'volcano', giver: 'pipo', type: 'collect', item: 'rag_doll', count: 1, consume: true,
+    desc: 'Pipo perdió su muñeco de trapo entre las piedras negras del este de la cuenca. Devuélveselo.',
+    reward: [['potion', 2], ['coin', 60]],
+    lines: {
+      offer: ['¿Tú eres el héroe? Mamá dice que sí, pero yo no me lo creo.', 'Se me cayó mi muñeco de trapo. Tiene un botón por ojo. Creo que está entre las piedras negras del este.'],
+      active: ['¡Busca bien! Es de trapo y tiene una oreja rota.'],
+      complete: ['¡Mi muñeco! ¡Lo has encontrado!', 'Toma, son pociones de mamá. Dice que son para ti, por ser valiente.'],
+      done: ['Ya duermo tranquilo. Dicen que los volcanes no duermen nunca... pero yo sí.'],
+    },
+  },
+  q_shards: {
+    name: 'Fragmentos de sombra', zone: 'volcano', giver: 'ardea', type: 'collect', item: 'shadow_shard', count: 3, consume: true,
+    requires: { flag: 'ardea_lore' },
+    desc: 'Ardea necesita 3 fragmentos de la sombra de Malakar. Flotan como ceniza negra por el plateau, la ladera y la cuenca.',
+    reward: [['heart_container', 1], ['coin', 80]],
+    lines: {
+      offer: ['Esa ceniza que flota en el aire... es un pedazo de Malakar.', 'Si se junta en el cráter, la Brasa Negra crecerá. Recoge tres fragmentos y tráemelos.'],
+      active: ['No reflejan la luz. Busca por el plateau, la ladera y la cuenca.'],
+      complete: ['Los tres. Están fríos... Ahora la brasa no podrá alimentarse de ellos.', 'Toma este corazón de cristal de la forja. Lo vas a necesitar ahí arriba.'],
+      done: ['Ve al cráter con cuidado. Ignar no es un monstruo: es nuestro guardián.'],
+    },
+  },
 };

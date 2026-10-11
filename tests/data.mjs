@@ -65,5 +65,17 @@ for (const id of ['volcano']) {
     ok(cands.some(([c, r]) => seen.has(key(c, r))), `${z.id}: ${e.type} ${e.id || e.kind || e.to || ''} alcanzable desde la aparición`);
   }
 }
+// fase 5: el cráter termina en dos salidas distintas, según la elección con la Brasa Negra
+{
+  const z = ZONES.volcano;
+  const exits = z.entities.filter((e) => e.type === 'portal' && e.to === 'credits');
+  ok(exits.length === 2 && exits.every((e) => e.ending?.title), 'volcano: dos salidas al final, cada una con su propio final');
+  ok(['v_destroy', 'v_seal'].every((f) => exits.some((e) => e.when?.flag === f)), 'volcano: una salida por cada elección (destruir o sellar)');
+  const choice = z.entities.find((e) => e.id === 'ardea_spirit')?.talk?.find((r) => r.choices);
+  ok(!!choice && ['v_destroy', 'v_seal'].every((f) => choice.choices.some((c) => c.do.some((a) => a.flag === f))), 'volcano: el espíritu de Ardea ofrece destruir o sellar');
+  ok(z.entities.filter((e) => e.type === 'brazier' && e.group === 'v_fire').length === 3, 'volcano: el puente tiene tres braseros en grupo');
+  ok(z.entities.some((e) => e.type === 'door' && e.id === 'v_bridge' && e.requires?.flag === 'v_bridge_open' && e.auto), 'volcano: la reja del puente se abre con los braseros');
+  ok(!!z.landmark && !!z.camera?.pitch, 'volcano: el volcán del horizonte y el ángulo de cámara están configurados');
+}
 console.log(fails ? `\n${fails} fallos` : '\nDatos correctos ✔');
 process.exit(fails ? 1 : 0);
