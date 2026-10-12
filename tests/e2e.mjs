@@ -211,7 +211,9 @@ try {
     if (!w) return null;
     window.__t.tp(27, 19.6); // orilla norte del estanque
     g.step(1 / 60);
-    // la ballena da saltos al azar y sin aviso mientras salta: se espera a que esté bajo el agua
+    // la ballena da saltos al azar y sin aviso mientras salta: se espera a que esté bajo el agua.
+    // Los pasos no dibujan: son miles de fotogramas y cada uno tardaría segundos en esta máquina
+    g.noRender = true;
     for (let k = 0; k < 900 && w.B.active; k++) g.step(1 / 60);
     const prompt = w.prompt;
     w.interact();
@@ -222,6 +224,7 @@ try {
       foam = Math.max(foam, w.foam.uniforms.uFoam.value);
       if (w.B.active) maxY = Math.max(maxY, w.W.body.getWorldPosition(w._v).y);
     }
+    g.noRender = false;
     return { prompt, breaches: w.breaches, maxSpray, maxY, foam, hidden: !w.W.root.visible, seen: g.progress.flags.has('saw_whale') };
   });
   ok(whale && /Silbar/.test(whale.prompt), `en la orilla del estanque aparece "${whale?.prompt}"`);
