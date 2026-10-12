@@ -274,11 +274,11 @@ export const QUESTS = {
     name: 'Cristales de hielo', zone: 'volcano', giver: 'brasio', type: 'collect', item: 'frost_crystal', count: 6, consume: false,
     requires: { flag: 'entered_volcano' },
     desc: 'Brasio, el minero de la cuenca, necesita 6 cristales de hielo contra el dragón de brasa. Hay cristales entre las piedras negras de la cuenca. Esta vez no se gastan: los necesitarás en el cráter.',
-    reward: [['heart_container', 1], ['potion', 2]],
+    reward: [['heart_container', 1], ['potion', 2], ['frost_crystal', 3]],
     lines: {
       offer: ['El dragón de brasa no se hiere con acero. Solo el hielo lo detiene.', 'Hay cristales de hielo entre las piedras negras de la cuenca. Tráeme seis.'],
       active: ['Brillan con luz fría entre las piedras de la cuenca. Busca bien.'],
-      complete: ['¡Seis! Con estos el dragón no podrá escapar del hielo.', 'Guárdalos bien: lánzalos con G y golpea mientras esté congelado.'],
+      complete: ['¡Seis! Con estos el dragón no podrá escapar del hielo.', 'Guárdalos bien: lánzalos con G y golpea mientras esté congelado.', 'Toma tres más de reserva: si alguno falla, aún te quedarán para el dragón.'],
       done: ['Los cristales están listos. Ahora solo falta que el dragón despierte.'],
     },
   },

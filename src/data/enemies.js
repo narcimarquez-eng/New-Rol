@@ -191,6 +191,7 @@ export const ENEMIES = {
   dragon: {
     name: 'Dragón de Brasa', model: 'dragon', ai: 'dragon', hp: 48, dmg: 4, speed: 2.4, sight: 40, attackRange: 3.4, radius: 2.4,
     cooldown: 1.4, windup: 0.7, knockback: 0.5, boss: true, color: 0xff6a20, frostGuard: true,
+    phase2Text: '¡El dragón de brasa se enfurece y acelera!', summonCount: 0,
     monster: { name: 'dragon', height: 6, headBone: 'cabeza', chestBone: 'pecho', walkPace: 0.5, runPace: 1.2, puff: 0xff8a3a,
       clips: { idle: 'reposo', walk: 'aleteo', run: 'aleteo', hurt: 'golpe', death: 'muerte' } },
     clips: { swing: 'ataque', slam: 'ataque', throw: 'ataque' },

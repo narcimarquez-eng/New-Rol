@@ -735,7 +735,8 @@ export class Game {
   /** Lanza un cristal de hielo hacia donde mira el héroe (tecla G, L3 o el botón ❄️). */
   throwFrost() {
     const p = this.player;
-    if (!this.progress.has('frost_crystal') || p.state === 'dead' || this.mode !== 'play') return;
+    if (p.state === 'dead' || this.mode !== 'play') return;
+    if (!this.progress.has('frost_crystal')) { this.ui.toast('No te quedan cristales de hielo.'); return; }
     this.progress.take('frost_crystal');
     const s = Math.sin(p.facing), c = Math.cos(p.facing);
     const mesh = new THREE.Mesh(this.frostGeo || (this.frostGeo = new THREE.OctahedronGeometry(0.35, 0)),

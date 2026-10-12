@@ -149,7 +149,7 @@ export class Enemy {
     else this.mat.color.setRGB(0.85, 1.05, 1.3);
     // invoca refuerzos a los lados
     const summon = this.def.summon || 'goblin';
-    for (const off of [[-4, 0], [4, 0], [0, -4]].slice(0, this.def.summonCount || 2)) {
+    for (const off of [[-4, 0], [4, 0], [0, -4]].slice(0, this.def.summonCount ?? 2)) {
       const c = (this.pos.x + off[0] + g.zone.W * TILE / 2) / TILE - 0.5;
       const r = (this.pos.z + off[1] + g.zone.H * TILE / 2) / TILE - 0.5;
       if (!g.zone.collision.blocked(this.pos.x + off[0], this.pos.z + off[1], 0.7)) g.spawnEnemy({ kind: summon, tile: [c, r], summoned: true });

@@ -86,6 +86,8 @@ for (const file of ['src/data/quests.js', 'src/data/items.js', 'src/data/enemies
   ok(!!dragon && !!dragon.emerge && dragonWhen.some((c) => c.flag === 'v_choice_done') && dragonWhen.some((c) => c.quest?.id === 'q_hielo'),
     'volcano: el dragón de brasa aparece tras la elección y la misión de cristales, y sale de la roca');
   ok(z.entities.filter((e) => e.type === 'pickup' && e.item === 'frost_crystal').length >= 6, 'volcano: hay al menos seis cristales de hielo para la misión');
+  ok(QUESTS.q_hielo.reward.some(([id, n]) => id === 'frost_crystal' && n >= 3), 'volcano: Brasio da tres cristales de reserva (un lanzamiento fallido no deja sin armas al dragón)');
+  ok(ENEMIES.dragon.summonCount === 0, 'volcano: el dragón no invoca refuerzos al enfurecerse');
   const choice = z.entities.find((e) => e.id === 'ardea_spirit')?.talk?.find((r) => r.choices);
   ok(!!choice && ['v_destroy', 'v_seal'].every((f) => choice.choices.some((c) => c.do.some((a) => a.flag === f))), 'volcano: el espíritu de Ardea ofrece destruir o sellar');
   ok(z.entities.filter((e) => e.type === 'brazier' && e.group === 'v_fire').length === 3, 'volcano: el puente tiene tres braseros en grupo');
